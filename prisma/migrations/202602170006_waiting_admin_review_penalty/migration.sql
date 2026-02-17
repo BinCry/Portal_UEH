@@ -1,0 +1,8 @@
+ALTER TYPE "WaitingEntryState" ADD VALUE IF NOT EXISTS 'PENDING_ADMIN';
+
+ALTER TABLE "StudentProfile"
+ADD COLUMN IF NOT EXISTS "waitingRoomBlockedUntil" TIMESTAMP(3),
+ADD COLUMN IF NOT EXISTS "priorityPenaltyUntil" TIMESTAMP(3);
+
+ALTER TABLE "WaitingEntry"
+ADD COLUMN IF NOT EXISTS "matchedPriority" INTEGER;

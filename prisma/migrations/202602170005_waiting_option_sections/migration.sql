@@ -1,0 +1,1 @@
+ALTER TABLE "Section" ADD COLUMN "isWaitingOption" BOOLEAN NOT NULL DEFAULT false;

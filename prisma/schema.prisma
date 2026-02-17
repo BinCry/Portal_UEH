@@ -1,0 +1,304 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+  DISABLED
+}
+
+enum SectionStatus {
+  OPEN
+  CLOSED
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  CANCELLED
+}
+
+enum WaitingEntryState {
+  QUEUED
+  PENDING_ADMIN
+  OFFERED
+  CONFIRMED
+  DECLINED
+  EXPIRED
+  FAILED
+  DEFERRED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  AUTO_APPROVED
+}
+
+enum NotificationType {
+  WAITING_OFFER
+  WAITING_REJECTED
+  WAITING_EXPIRED
+  SYSTEM
+}
+
+enum FinanceStatus {
+  PENDING
+  POSTED
+  VOID
+}
+
+enum CoursePlanType {
+  IN_PLAN
+  OUT_PLAN
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model User {
+  id                  String             @id @default(cuid())
+  email               String             @unique
+  passwordHash        String
+  role                Role
+  status              UserStatus         @default(ACTIVE)
+  failedLoginAttempts Int                @default(0)
+  lastFailedLoginAt   DateTime?
+  lockUntil           DateTime?
+  canOverrideCapacity Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  studentProfile      StudentProfile?
+  adminProfile        AdminProfile?
+  enrollments         Enrollment[]       @relation("StudentEnrollments")
+  waitingEntries      WaitingEntry[]     @relation("StudentWaitingEntries")
+  notifications       Notification[]
+  financeLedgers      FinanceLedger[]    @relation("StudentFinanceLedgers")
+  passwordResetOtps   PasswordResetOtp[]
+  approvals           Approval[]         @relation("ApprovedBy")
+}
+
+model StudentProfile {
+  userId       String @id
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentCode  String @unique
+  fullName     String
+  faculty      String?
+  phoneNumber  String?
+  dateOfBirth  DateTime?
+  waitingRoomBlockedUntil DateTime?
+  priorityPenaltyUntil    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AdminProfile {
+  userId      String @id
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String
+  department  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Course {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  faculty      String        @default("Chưa phân ngành")
+  credits      Int
+  planType     CoursePlanType @default(IN_PLAN)
+  isActive     Boolean       @default(true)
+  sections     Section[]
+  waitingRoom  WaitingRoom?
+  financeRows  FinanceLedger[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([faculty, planType, isActive])
+}
+
+model Instructor {
+  id         String    @id @default(cuid())
+  name       String
+  email      String?   @unique
+  sections   Section[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Room {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  campus     String?
+  address    String?
+  building   String
+  capacity   Int
+  sections   Section[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model TimeSlot {
+  id         String    @id @default(cuid())
+  label      String    @unique
+  startTime  String
+  endTime    String
+  sections   Section[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Section {
+  id              String         @id @default(cuid())
+  code            String         @unique
+  courseId        String
+  instructorId    String
+  roomId          String
+  dayOfWeek       DayOfWeek
+  timeSlotId      String
+  startDate       DateTime?
+  endDate         DateTime?
+  capacity        Int
+  isWaitingOption Boolean        @default(false)
+  capacityHidden  Boolean        @default(false)
+  registeredCount Int            @default(0)
+  reservedCount   Int            @default(0)
+  status          SectionStatus  @default(OPEN)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructor      Instructor     @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  room            Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  timeSlot        TimeSlot       @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
+  enrollments     Enrollment[]
+  offeredEntries  WaitingEntry[] @relation("OfferSection")
+  financeRows     FinanceLedger[]
+
+  @@index([courseId, status])
+  @@index([dayOfWeek, timeSlotId])
+}
+
+model Enrollment {
+  id         String           @id @default(cuid())
+  studentId  String
+  sectionId  String
+  status     EnrollmentStatus @default(ENROLLED)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  student    User             @relation("StudentEnrollments", fields: [studentId], references: [id], onDelete: Cascade)
+  section    Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, sectionId])
+  @@index([studentId, status])
+}
+
+model WaitingRoom {
+  id          String         @id @default(cuid())
+  courseId    String         @unique
+  isActive    Boolean        @default(false)
+  activatedAt DateTime?
+  buffer      Int            @default(5)
+  slaHours    Int            @default(48)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  course      Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  entries     WaitingEntry[]
+  approvals   Approval[]
+}
+
+model WaitingEntry {
+  id             String            @id @default(cuid())
+  waitingRoomId  String
+  studentId      String
+  joinedAt       DateTime          @default(now())
+  termsAcceptedAt DateTime?
+  prioritiesJson Json
+  state          WaitingEntryState @default(QUEUED)
+  offerSectionId String?
+  matchedPriority Int?
+  expiresAt      DateTime?
+  reason         String?
+  lastNotifiedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  waitingRoom    WaitingRoom       @relation(fields: [waitingRoomId], references: [id], onDelete: Cascade)
+  student        User              @relation("StudentWaitingEntries", fields: [studentId], references: [id], onDelete: Cascade)
+  offerSection   Section?          @relation("OfferSection", fields: [offerSectionId], references: [id], onDelete: SetNull)
+
+  @@index([waitingRoomId, state, joinedAt])
+  @@index([studentId, state])
+}
+
+model Approval {
+  id            String         @id @default(cuid())
+  waitingRoomId String
+  status        ApprovalStatus @default(PENDING)
+  reason        String?
+  approvedById  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  dueAt         DateTime
+  waitingRoom   WaitingRoom    @relation(fields: [waitingRoomId], references: [id], onDelete: Cascade)
+  approvedBy    User?          @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([waitingRoomId, status, dueAt])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType
+  payloadJson Json
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model FinanceLedger {
+  id         String        @id @default(cuid())
+  studentId  String
+  courseId   String?
+  sectionId  String?
+  amount     Decimal       @db.Decimal(12, 2)
+  status     FinanceStatus @default(POSTED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  student    User          @relation("StudentFinanceLedgers", fields: [studentId], references: [id], onDelete: Cascade)
+  course     Course?       @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  section    Section?      @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+}
+
+model PasswordResetOtp {
+  id          String   @id @default(cuid())
+  userId      String
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attemptCount Int     @default(0)
+  lastSentAt  DateTime
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}

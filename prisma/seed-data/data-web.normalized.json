@@ -1,0 +1,306 @@
+{
+  "generatedAt": "2026-02-17T05:41:14.931Z",
+  "sourcePath": "C:\\Users\\HP\\Downloads\\DATA WEB.xlsx",
+  "courses": [
+    {
+      "classification": "Trong kế hoạch",
+      "courseCode": "BUS50317802",
+      "courseName": "Quản trị chiến lược toàn cầu",
+      "credits": 3,
+      "sections": [
+        {
+          "sectionCode": "26D1BUS50317802",
+          "credits": 3,
+          "registeredCount": 40,
+          "remainingSeats": 5,
+          "capacity": 45,
+          "dayOfWeek": "WEDNESDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-01-07",
+          "endDate": "2025-03-18",
+          "roomCode": "P-7802",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Trong kế hoạch",
+      "courseCode": "BUS50316523",
+      "courseName": "Quản trị chiến lược toàn cầu",
+      "credits": 3,
+      "sections": [
+        {
+          "sectionCode": "26D1BUS50316523",
+          "credits": 3,
+          "registeredCount": 20,
+          "remainingSeats": 25,
+          "capacity": 45,
+          "dayOfWeek": "FRIDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-01-09",
+          "endDate": "2025-03-20",
+          "roomCode": "P-6523",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Trong kế hoạch",
+      "courseCode": "BUS50315894",
+      "courseName": "Quản trị chiến lược toàn cầu",
+      "credits": 3,
+      "sections": [
+        {
+          "sectionCode": "26D1BUS50315894",
+          "credits": 3,
+          "registeredCount": 25,
+          "remainingSeats": 20,
+          "capacity": 45,
+          "dayOfWeek": "SATURDAY",
+          "startTime": "12:45",
+          "endTime": "17:05",
+          "timeSlotLabel": "12:45-17:05",
+          "startDate": "2025-01-10",
+          "endDate": "2025-03-21",
+          "roomCode": "P-5894",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Trong kế hoạch",
+      "courseCode": "BUS50330109",
+      "courseName": "Nghiên cứu ứng dụng trong kinh doanh",
+      "credits": 3,
+      "sections": [
+        {
+          "sectionCode": "26D1BUS50330109",
+          "credits": 3,
+          "registeredCount": 12,
+          "remainingSeats": 33,
+          "capacity": 45,
+          "dayOfWeek": "FRIDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-01-09",
+          "endDate": "2025-03-20",
+          "roomCode": "P-0109",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Trong kế hoạch",
+      "courseCode": "BUS50330598",
+      "courseName": "Nghiên cứu ứng dụng trong kinh doanh",
+      "credits": 3,
+      "sections": [
+        {
+          "sectionCode": "26D1BUS50330598",
+          "credits": 3,
+          "registeredCount": 37,
+          "remainingSeats": 8,
+          "capacity": 45,
+          "dayOfWeek": "MONDAY",
+          "startTime": "12:45",
+          "endTime": "17:05",
+          "timeSlotLabel": "12:45-17:05",
+          "startDate": "2025-01-05",
+          "endDate": "2025-03-16",
+          "roomCode": "P-0598",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Trong kế hoạch",
+      "courseCode": "BUS50330667",
+      "courseName": "Nghiên cứu ứng dụng trong kinh doanh",
+      "credits": 3,
+      "sections": [
+        {
+          "sectionCode": "26D1BUS50330667",
+          "credits": 3,
+          "registeredCount": 42,
+          "remainingSeats": 3,
+          "capacity": 45,
+          "dayOfWeek": "TUESDAY",
+          "startTime": "12:45",
+          "endTime": "17:05",
+          "timeSlotLabel": "12:45-17:05",
+          "startDate": "2025-01-06",
+          "endDate": "2025-03-16",
+          "roomCode": "P-0667",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Ngoài kế hoạch",
+      "courseCode": "BUS50309505",
+      "courseName": "Kỹ năng mềm",
+      "credits": 2,
+      "sections": [
+        {
+          "sectionCode": "25C1BUS50309505",
+          "credits": 2,
+          "registeredCount": 30,
+          "remainingSeats": 15,
+          "capacity": 45,
+          "dayOfWeek": "THURSDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-01-08",
+          "endDate": "2025-01-29",
+          "roomCode": "P-9505",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Ngoài kế hoạch",
+      "courseCode": "BUS50308654",
+      "courseName": "Kỹ năng mềm",
+      "credits": 2,
+      "sections": [
+        {
+          "sectionCode": "25C1BUS50308654",
+          "credits": 2,
+          "registeredCount": 32,
+          "remainingSeats": 13,
+          "capacity": 45,
+          "dayOfWeek": "TUESDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-02-23",
+          "endDate": "2025-03-16",
+          "roomCode": "P-8654",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Ngoài kế hoạch",
+      "courseCode": "BUS50453042",
+      "courseName": "Kỹ năng mềm",
+      "credits": 2,
+      "sections": [
+        {
+          "sectionCode": "25C1BUS50453042",
+          "credits": 2,
+          "registeredCount": 41,
+          "remainingSeats": 4,
+          "capacity": 45,
+          "dayOfWeek": "WEDNESDAY",
+          "startTime": "12:45",
+          "endTime": "17:05",
+          "timeSlotLabel": "12:45-17:05",
+          "startDate": "2025-02-24",
+          "endDate": "2025-03-17",
+          "roomCode": "P-3042",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Ngoài kế hoạch",
+      "courseCode": "HIS51002645",
+      "courseName": "Lịch sử Đảng Cộng Sản Việt Nam",
+      "credits": 2,
+      "sections": [
+        {
+          "sectionCode": "26D1HIS51002645",
+          "credits": 2,
+          "registeredCount": 45,
+          "remainingSeats": 45,
+          "capacity": 90,
+          "dayOfWeek": "MONDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-01-05",
+          "endDate": "2025-01-26",
+          "roomCode": "P-2645",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Ngoài kế hoạch",
+      "courseCode": "HIS51002489",
+      "courseName": "Lịch sử Đảng Cộng Sản Việt Nam",
+      "credits": 2,
+      "sections": [
+        {
+          "sectionCode": "26D1HIS51002489",
+          "credits": 2,
+          "registeredCount": 40,
+          "remainingSeats": 45,
+          "capacity": 85,
+          "dayOfWeek": "TUESDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-01-06",
+          "endDate": "2025-01-27",
+          "roomCode": "P-2489",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    },
+    {
+      "classification": "Ngoài kế hoạch",
+      "courseCode": "HIS51005594",
+      "courseName": "Lịch sử Đảng Cộng Sản Việt Nam",
+      "credits": 2,
+      "sections": [
+        {
+          "sectionCode": "26D1HIS51005594",
+          "credits": 2,
+          "registeredCount": 18,
+          "remainingSeats": 27,
+          "capacity": 45,
+          "dayOfWeek": "THURSDAY",
+          "startTime": "07:10",
+          "endTime": "11:30",
+          "timeSlotLabel": "07:10-11:30",
+          "startDate": "2025-02-24",
+          "endDate": "2025-03-17",
+          "roomCode": "P-5594",
+          "campus": "Cơ sở Nam Sài Gòn",
+          "address": "Đường Nguyễn Văn Linh - Khu chức năng số 15, Đô thị mới Nam TP, Xã Bình Hưng, TP. Hồ Chí Minh",
+          "building": "Cơ sở Nam Sài Gòn"
+        }
+      ]
+    }
+  ]
+}

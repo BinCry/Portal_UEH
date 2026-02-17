@@ -1,36 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UEH Smart Registration Portal
 
-## Getting Started
+Ứng dụng fullstack Next.js cho cổng đăng ký học phần thông minh, có phòng chờ FIFO, SLA 48h và phân quyền Student/Admin.
 
-First, run the development server:
+## Stack
+- Next.js App Router + TypeScript
+- TailwindCSS + shadcn/ui + framer-motion
+- Prisma + PostgreSQL (Neon/Supabase)
+- Auth.js Credentials
+- OTP email qua Nodemailer (local dùng MailHog)
+- Zod validation
+- Vitest (unit/integration) + Playwright (e2e)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Nghiệp vụ chính
+- Auth đầy đủ: login/logout, lock account 5 lần sai/15 phút, đổi mật khẩu, quên/đặt lại mật khẩu bằng OTP.
+- Student:
+  - Chỉ thấy học phần đúng **ngành/chương trình đào tạo** của mình.
+  - Phân tách `Trong kế hoạch` / `Ngoài kế hoạch`.
+  - Đăng ký trực tiếp, tham gia phòng chờ FIFO, xác nhận/từ chối offer, xem lịch sử và tài chính.
+- Admin:
+  - Tạo học phần theo **ngành/chương trình đào tạo** + `Trong kế hoạch/Ngoài kế hoạch`.
+  - CRUD đào tạo + duyệt phòng chờ.
+  - Rule `capacity_hidden` + guard API cập nhật sĩ số.
+
+## Chuẩn bị `.env`
+Sao chép:
+
+```powershell
+cp .env.example .env
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Các biến bắt buộc:
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `NEXTAUTH_URL` (nên để `http://localhost:3000`)
+- `NEXTAUTH_SECRET`
+- `CRON_SECRET`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Chạy local (PowerShell Windows)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Cài dependencies:
 
-## Learn More
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" install
+```
 
-To learn more about Next.js, take a look at the following resources:
+2. Parse dữ liệu Excel seed:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" run seed:parse
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Migrate + seed:
 
-## Deploy on Vercel
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" run prisma:deploy
+& "C:\Program Files\nodejs\npm.cmd" run prisma:seed
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. Chạy app:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" run dev
+```
+
+## Tài khoản mặc định
+- Admin: `admin@ueh.edu.vn / 123456`
+- Student: `student1@ueh.edu.vn / 123456`
+
+## Chạy test
+
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" run lint
+& "C:\Program Files\nodejs\npm.cmd" run typecheck
+& "C:\Program Files\nodejs\npm.cmd" run test:unit
+& "C:\Program Files\nodejs\npm.cmd" run test:integration
+& "C:\Program Files\nodejs\npm.cmd" run test:e2e
+```
+
+`test:e2e` sẽ tự chạy `prisma:seed` trước khi mở Playwright để đảm bảo dữ liệu ổn định.
+
+Nếu e2e báo thiếu browser:
+
+```powershell
+& "C:\Program Files\nodejs\npx.cmd" playwright install chromium
+```
+
+## Deploy Vercel + Neon
+- Build command: `prisma migrate deploy && next build`
+- Set env vars ở Vercel giống `.env`.
+- Cron gọi:
+  - `/api/jobs/sla-scan`
+  - `/api/jobs/match-offers`
+  - `/api/jobs/expire-offers`
+
+## API response format
+
+```json
+{ "success": true, "data": {} }
+```
+
+hoặc
+
+```json
+{ "success": false, "error": { "code": "ERR", "message": "..." } }
+```
