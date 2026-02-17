@@ -20,7 +20,7 @@ export const AuthShell = ({
       <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-emerald-300/30 via-cyan-300/20 to-amber-200/20" />
       <div className="relative mb-6">
         <p className="text-primary mb-2 text-xs tracking-[0.2em] uppercase">UEH Registration Portal</p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-800">{title}</h1>
+        <h1 className="font-display text-3xl leading-tight font-semibold tracking-tight text-slate-800">{title}</h1>
         <p className="text-muted-foreground mt-2 text-sm">{description}</p>
       </div>
 

@@ -5,7 +5,7 @@ import "./globals.css";
 
 const beViet = Be_Vietnam_Pro({
   variable: "--font-vn",
-  subsets: ["latin"],
+  subsets: ["latin", "vietnamese"],
   weight: ["400", "500", "600", "700"],
 });
 
