@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Bell, X } from "lucide-react";
@@ -23,10 +23,10 @@ type NotificationItem = {
 };
 
 const typeLabel: Record<NotificationItem["type"], string> = {
-  WAITING_OFFER: "Ð? xu?t t? phòng ch?",
-  WAITING_REJECTED: "Phòng ch? b? t? ch?i",
-  WAITING_EXPIRED: "Offer h?t h?n",
-  SYSTEM: "H? th?ng",
+  WAITING_OFFER: "De xuat tu phong cho",
+  WAITING_REJECTED: "Phong cho bi tu choi",
+  WAITING_EXPIRED: "Offer het han",
+  SYSTEM: "He thong",
 };
 
 const typeTone: Record<NotificationItem["type"], string> = {
@@ -42,7 +42,7 @@ const extractText = (item: NotificationItem) => {
   const message =
     typeof messageCandidate === "string"
       ? messageCandidate
-      : "B?n có m?t c?p nh?t m?i. Vui lòng m? trang liên quan d? xem chi ti?t.";
+      : "Ban co mot cap nhat moi. Vui long mo trang lien quan de xem chi tiet.";
   return { title, message };
 };
 
@@ -60,39 +60,51 @@ export const NotificationBell = () => {
 
   useEffect(() => {
     void load();
-    const id = window.setInterval(() => void load(), 20_000);
+    const id = window.setInterval(() => void load(), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items]);
 
   const markRead = async () => {
+    const previous = items;
+    const readAt = new Date().toISOString();
+    setItems((current) => current.map((item) => (item.readAt ? item : { ...item, readAt })));
+
     const response = await fetch("/api/notifications/read", {
       method: "POST",
     });
     const payload = await response.json();
-    if (payload.success) {
-      toast.success("Ðã dánh d?u toàn b? thông báo dã d?c");
-      await load();
+    if (!response.ok || !payload.success) {
+      setItems(previous);
+      toast.error(payload.error?.message ?? "Khong the danh dau da doc");
+      return;
     }
+    toast.success("Da danh dau toan bo thong bao da doc");
   };
 
   const clearRead = async () => {
+    const previous = items;
+    setItems((current) => current.filter((item) => !item.readAt));
+
     const response = await fetch("/api/notifications/read", {
       method: "DELETE",
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "Không th? xóa thông báo dã d?c");
+      setItems(previous);
+      toast.error(payload.error?.message ?? "Khong the xoa thong bao da doc");
       return;
     }
 
-    toast.success(`Ðã xóa ${payload.data.deletedCount} thông báo dã d?c`);
-    await load();
+    toast.success(`Da xoa ${payload.data.deletedCount} thong bao da doc`);
   };
 
   const deleteOne = async (notificationId: string) => {
+    const previous = items;
+    setItems((current) => current.filter((item) => item.id !== notificationId));
     setDeletingId(notificationId);
+
     const response = await fetch(`/api/notifications/${notificationId}`, {
       method: "DELETE",
     });
@@ -100,11 +112,9 @@ export const NotificationBell = () => {
     setDeletingId(null);
 
     if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "Không th? xóa thông báo");
-      return;
+      setItems(previous);
+      toast.error(payload.error?.message ?? "Khong the xoa thong bao");
     }
-
-    setItems((prev) => prev.filter((item) => item.id !== notificationId));
   };
 
   return (
@@ -121,19 +131,19 @@ export const NotificationBell = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[360px]">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Thông báo</span>
+          <span>Thong bao</span>
           <div className="flex items-center gap-3">
             <button className="text-primary text-xs hover:underline" type="button" onClick={() => void markRead()}>
-              Ðánh d?u dã d?c
+              Danh dau da doc
             </button>
             <button className="text-destructive text-xs hover:underline" type="button" onClick={() => void clearRead()}>
-              Xóa dã d?c
+              Xoa da doc
             </button>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {items.length === 0 ? (
-          <DropdownMenuItem disabled>Chua có thông báo</DropdownMenuItem>
+          <DropdownMenuItem disabled>Chua co thong bao</DropdownMenuItem>
         ) : (
           items.slice(0, 12).map((item) => {
             const { title, message } = extractText(item);
@@ -154,7 +164,7 @@ export const NotificationBell = () => {
                           void deleteOne(item.id);
                         }}
                         disabled={deletingId === item.id}
-                        aria-label="Xóa thông báo"
+                        aria-label="Xoa thong bao"
                       >
                         <X className="size-3.5" />
                       </button>
@@ -173,4 +183,3 @@ export const NotificationBell = () => {
     </DropdownMenu>
   );
 };
-

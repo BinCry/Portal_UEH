@@ -171,18 +171,47 @@ export const waitingEntryService = {
       where: {
         studentId,
       },
-      include: {
+      select: {
+        id: true,
+        waitingRoomId: true,
+        state: true,
+        joinedAt: true,
+        expiresAt: true,
+        matchedPriority: true,
+        reason: true,
         waitingRoom: {
-          include: {
-            course: true,
+          select: {
+            course: {
+              select: {
+                code: true,
+                name: true,
+              },
+            },
           },
         },
         offerSection: {
-          include: {
-            timeSlot: true,
-            room: true,
-            instructor: true,
-            course: true,
+          select: {
+            code: true,
+            dayOfWeek: true,
+            timeSlot: {
+              select: {
+                label: true,
+                startTime: true,
+                endTime: true,
+              },
+            },
+            room: {
+              select: {
+                campus: true,
+                code: true,
+                address: true,
+              },
+            },
+            instructor: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },

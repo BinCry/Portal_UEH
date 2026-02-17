@@ -1,18 +1,28 @@
 import { fail, ok } from "@/lib/api";
+import { withApiTiming } from "@/lib/api-timing";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/route-guards";
 
 export async function GET() {
-  const auth = await requireApiRole();
-  if (!auth.ok) {
-    return fail({ code: "UNAUTHORIZED", message: auth.message }, auth.status);
-  }
+  return withApiTiming("GET /api/notifications/me", async () => {
+    const auth = await requireApiRole();
+    if (!auth.ok) {
+      return fail({ code: "UNAUTHORIZED", message: auth.message }, auth.status);
+    }
 
-  const notifications = await prisma.notification.findMany({
-    where: { userId: auth.user.id },
-    orderBy: { createdAt: "desc" },
-    take: 30,
+    const notifications = await prisma.notification.findMany({
+      where: { userId: auth.user.id },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        type: true,
+        payloadJson: true,
+        readAt: true,
+        createdAt: true,
+      },
+    });
+
+    return ok(notifications);
   });
-
-  return ok(notifications);
 }

@@ -79,6 +79,7 @@ export const WaitingHistory = () => {
   const [waitingItems, setWaitingItems] = useState<WaitingItem[]>([]);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ title: string; rows: Array<{ label: string; value: string }> } | null>(null);
 
   const load = async () => {
@@ -100,13 +101,60 @@ export const WaitingHistory = () => {
   }, []);
 
   const action = async (type: "confirm" | "decline", waitingEntryId: string) => {
+    const target = waitingItems.find((item) => item.id === waitingEntryId);
+    if (!target) return;
+
+    const previousWaitingItems = waitingItems;
+    const previousEnrollments = enrollments;
+    const optimisticState = type === "confirm" ? "CONFIRMED" : "DECLINED";
+    setActionLoadingId(waitingEntryId);
+    setWaitingItems((current) =>
+      current.map((item) =>
+        item.id === waitingEntryId
+          ? {
+              ...item,
+              state: optimisticState,
+              reason: type === "confirm" ? "Đã xác nhận (đang đồng bộ...)" : "Đã từ chối (đang đồng bộ...)",
+            }
+          : item,
+      ),
+    );
+
+    if (type === "confirm" && target.offerSection) {
+      const optimisticEnrollment: EnrollmentItem = {
+        id: `optimistic-${waitingEntryId}`,
+        source: "WAITING_ROOM",
+        createdAt: new Date().toISOString(),
+        section: {
+          code: target.offerSection.code,
+          dayOfWeek: target.offerSection.dayOfWeek,
+          course: {
+            code: target.waitingRoom.course.code,
+            name: target.waitingRoom.course.name,
+          },
+          room: {
+            campus: target.offerSection.room.campus,
+            code: target.offerSection.room.code,
+          },
+          timeSlot: {
+            label: target.offerSection.timeSlot.label,
+          },
+        },
+      };
+      setEnrollments((current) => [optimisticEnrollment, ...current]);
+    }
+
     const response = await fetch(`/api/waiting/${type}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ waitingEntryId }),
     });
     const payload = await response.json();
+    setActionLoadingId(null);
+
     if (!response.ok || !payload.success) {
+      setWaitingItems(previousWaitingItems);
+      setEnrollments(previousEnrollments);
       toast.error(payload.error?.message ?? "Không thể xử lý");
       return;
     }
@@ -243,10 +291,18 @@ export const WaitingHistory = () => {
                   <TableCell className="space-x-2 text-right">
                     {item.state === "OFFERED" ? (
                       <>
-                        <Button className="primary-glow" onClick={() => void action("confirm", item.id)}>
+                        <Button
+                          className="primary-glow"
+                          onClick={() => void action("confirm", item.id)}
+                          disabled={actionLoadingId === item.id}
+                        >
                           Xác nhận
                         </Button>
-                        <Button variant="outline" onClick={() => void action("decline", item.id)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => void action("decline", item.id)}
+                          disabled={actionLoadingId === item.id}
+                        >
                           Từ chối
                         </Button>
                       </>
