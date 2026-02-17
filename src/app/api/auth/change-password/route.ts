@@ -1,19 +1,13 @@
 ﻿import { fail, ok } from "@/lib/api";
 import { parseBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/route-guards";
 import { hashPassword, verifyPassword } from "@/lib/security/password";
 import { changePasswordSchema } from "@/lib/zod-schemas/auth";
 
 export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) {
-    return fail({ code: "UNAUTHORIZED", message: "Chưa đăng nhập" }, 401);
-  }
-
   try {
     const body = await parseBody(request, changePasswordSchema);
-    const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+    const dbUser = await prisma.user.findUnique({ where: { email: body.email.toLowerCase() } });
     if (!dbUser) {
       return fail({ code: "NOT_FOUND", message: "Không tìm thấy tài khoản" }, 404);
     }
@@ -41,4 +35,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

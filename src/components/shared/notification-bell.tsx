@@ -23,10 +23,10 @@ type NotificationItem = {
 };
 
 const typeLabel: Record<NotificationItem["type"], string> = {
-  WAITING_OFFER: "De xuat tu phong cho",
-  WAITING_REJECTED: "Phong cho bi tu choi",
-  WAITING_EXPIRED: "Offer het han",
-  SYSTEM: "He thong",
+  WAITING_OFFER: "Đề xuất từ phòng chờ",
+  WAITING_REJECTED: "Phòng chờ bị từ chối",
+  WAITING_EXPIRED: "Offer hết hạn",
+  SYSTEM: "Hệ thống",
 };
 
 const typeTone: Record<NotificationItem["type"], string> = {
@@ -42,7 +42,7 @@ const extractText = (item: NotificationItem) => {
   const message =
     typeof messageCandidate === "string"
       ? messageCandidate
-      : "Ban co mot cap nhat moi. Vui long mo trang lien quan de xem chi tiet.";
+      : "Bạn có một cập nhật mới. Vui lòng mở trang liên quan để xem chi tiết.";
   return { title, message };
 };
 
@@ -81,10 +81,10 @@ export const NotificationBell = () => {
     const payload = await response.json();
     if (!response.ok || !payload.success) {
       setItems(previous);
-      toast.error(payload.error?.message ?? "Khong the danh dau da doc");
+      toast.error(payload.error?.message ?? "Không thể đánh dấu đã đọc");
       return;
     }
-    toast.success("Da danh dau toan bo thong bao da doc");
+    toast.success("Đã đánh dấu toàn bộ thông báo đã đọc");
   };
 
   const clearRead = async () => {
@@ -97,11 +97,11 @@ export const NotificationBell = () => {
     const payload = await response.json();
     if (!response.ok || !payload.success) {
       setItems(previous);
-      toast.error(payload.error?.message ?? "Khong the xoa thong bao da doc");
+      toast.error(payload.error?.message ?? "Không thể xóa thông báo đã đọc");
       return;
     }
 
-    toast.success(`Da xoa ${payload.data.deletedCount} thong bao da doc`);
+    toast.success(`Đã xóa ${payload.data.deletedCount} thông báo đã đọc`);
   };
 
   const deleteOne = async (notificationId: string) => {
@@ -117,7 +117,7 @@ export const NotificationBell = () => {
 
     if (!response.ok || !payload.success) {
       setItems(previous);
-      toast.error(payload.error?.message ?? "Khong the xoa thong bao");
+      toast.error(payload.error?.message ?? "Không thể xóa thông báo");
     }
   };
 
@@ -135,19 +135,19 @@ export const NotificationBell = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[360px]">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Thong bao</span>
+          <span>Thông báo</span>
           <div className="flex items-center gap-3">
             <button className="text-primary text-xs hover:underline" type="button" onClick={() => void markRead()}>
-              Danh dau da doc
+              Đánh dấu đã đọc
             </button>
             <button className="text-destructive text-xs hover:underline" type="button" onClick={() => void clearRead()}>
-              Xoa da doc
+              Xóa đã đọc
             </button>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {items.length === 0 ? (
-          <DropdownMenuItem disabled>Chua co thong bao</DropdownMenuItem>
+          <DropdownMenuItem disabled>Chưa có thông báo</DropdownMenuItem>
         ) : (
           items.slice(0, 12).map((item) => {
             const { title, message } = extractText(item);
@@ -168,7 +168,7 @@ export const NotificationBell = () => {
                           void deleteOne(item.id);
                         }}
                         disabled={deletingId === item.id}
-                        aria-label="Xoa thong bao"
+                        aria-label="Xóa thông báo"
                       >
                         <X className="size-3.5" />
                       </button>

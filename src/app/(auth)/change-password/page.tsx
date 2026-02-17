@@ -1,10 +1,7 @@
 ﻿"use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/shared/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -12,67 +9,52 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function ChangePasswordPage() {
-  const router = useRouter();
-  const { status } = useSession();
+  const [email, setEmail] = useState("");
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace("/login?next=/change-password");
-    }
-  }, [router, status]);
-
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (status !== "authenticated") {
-      toast.error("Vui long dang nhap truoc khi doi mat khau");
-      return;
-    }
-
     setLoading(true);
+
     const response = await fetch("/api/auth/change-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ oldPassword, newPassword }),
+      body: JSON.stringify({ email, oldPassword, newPassword }),
     });
     const payload = await response.json();
     setLoading(false);
 
     if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "Khong the doi mat khau");
+      toast.error(payload.error?.message ?? "Không thể đổi mật khẩu");
       return;
     }
 
-    toast.success("Doi mat khau thanh cong");
+    toast.success("Đổi mật khẩu thành công");
+    setOldPassword("");
+    setNewPassword("");
   };
 
-  if (status === "loading") {
-    return (
-      <AuthShell title="Doi mat khau" description="Dang kiem tra dang nhap...">
-        <div className="flex justify-center py-8">
-          <Loader2 className="size-5 animate-spin" />
-        </div>
-      </AuthShell>
-    );
-  }
-
-  if (status === "unauthenticated") {
-    return (
-      <AuthShell title="Doi mat khau" description="Ban can dang nhap de tiep tuc">
-        <Button className="primary-glow w-full" asChild>
-          <Link href="/login?next=/change-password">Dang nhap</Link>
-        </Button>
-      </AuthShell>
-    );
-  }
-
   return (
-    <AuthShell title="Doi mat khau" description="Yeu cau dang nhap truoc khi doi mat khau">
+    <AuthShell title="Đổi mật khẩu" description="Nhập tài khoản, mật khẩu cũ và mật khẩu mới để cập nhật">
       <form className="space-y-4" onSubmit={onSubmit}>
+        <div className="rounded-xl border border-cyan-200/70 bg-cyan-50/60 p-3 text-xs text-slate-700">
+          Luồng này không yêu cầu đăng nhập trước. Bạn cần nhập đúng email và mật khẩu hiện tại của tài khoản.
+        </div>
         <div className="space-y-2">
-          <Label htmlFor="oldPassword">Mat khau cu</Label>
+          <Label htmlFor="email">Email tài khoản</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="you@ueh.edu.vn"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="oldPassword">Mật khẩu cũ</Label>
           <Input
             id="oldPassword"
             type="password"
@@ -82,7 +64,7 @@ export default function ChangePasswordPage() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="newPassword">Mat khau moi</Label>
+          <Label htmlFor="newPassword">Mật khẩu mới</Label>
           <Input
             id="newPassword"
             type="password"
@@ -93,7 +75,7 @@ export default function ChangePasswordPage() {
         </div>
         <Button className="primary-glow w-full" type="submit" disabled={loading}>
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
-          Cap nhat mat khau
+          Cập nhật mật khẩu
         </Button>
       </form>
     </AuthShell>
