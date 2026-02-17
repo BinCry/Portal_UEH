@@ -73,6 +73,10 @@ const resolveCoursePlanType = (classification: string): CoursePlanType => {
 const defaultCourseFaculty = process.env.SEED_DEFAULT_FACULTY ?? "Kinh doanh";
 
 const main = async () => {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED !== "true") {
+    throw new Error("Refusing to run prisma seed in production. Set ALLOW_PRODUCTION_SEED=true to override.");
+  }
+
   const seed = resolveSeedData();
   const defaultPassword = process.env.SEED_DEFAULT_PASSWORD ?? "123456";
   const passwordHash = await bcrypt.hash(defaultPassword, 12);
@@ -311,8 +315,8 @@ const main = async () => {
   });
 
   console.log("Seed hoàn tất.");
-  console.log("Admin:", "admin@ueh.edu.vn /", defaultPassword);
-  console.log("Student:", "student1@ueh.edu.vn /", defaultPassword);
+  console.log("Admin:", "admin@ueh.edu.vn");
+  console.log("Student:", "student1@ueh.edu.vn");
 };
 
 main()

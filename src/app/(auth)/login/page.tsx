@@ -13,8 +13,8 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const params = useSearchParams();
-  const [email, setEmail] = useState("student1@ueh.edu.vn");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

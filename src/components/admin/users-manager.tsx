@@ -25,7 +25,7 @@ const initialForm = {
   fullName: "",
   studentCode: "",
   faculty: "",
-  defaultPassword: "123456",
+  defaultPassword: "",
 };
 
 export const UsersManager = () => {
@@ -95,6 +95,8 @@ export const UsersManager = () => {
             <div className="space-y-2">
               <Label>Mật khẩu mặc định</Label>
               <Input
+                type="password"
+                placeholder="Temporary password"
                 value={form.defaultPassword}
                 onChange={(e) => setForm({ ...form, defaultPassword: e.target.value })}
                 required

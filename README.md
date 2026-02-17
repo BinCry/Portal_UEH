@@ -64,8 +64,9 @@ Các biến bắt buộc:
 ```
 
 ## Tài khoản mặc định
-- Admin: `admin@ueh.edu.vn / 123456`
-- Student: `student1@ueh.edu.vn / 123456`
+- Admin: `admin@ueh.edu.vn / <SEED_DEFAULT_PASSWORD>`
+- Student: `student1@ueh.edu.vn / <SEED_DEFAULT_PASSWORD>`
+- Only for local/dev after seeding. Do not keep these accounts in production.
 
 ## Chạy test
 
