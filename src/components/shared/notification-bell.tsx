@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +23,10 @@ type NotificationItem = {
 };
 
 const typeLabel: Record<NotificationItem["type"], string> = {
-  WAITING_OFFER: "ƒê·ªÅ xu·∫•t t·ª´ ph√≤ng ch·ªù",
-  WAITING_REJECTED: "Ph√≤ng ch·ªù b·ªã t·ª´ ch·ªëi",
-  WAITING_EXPIRED: "Offer h·∫øt h·∫°n",
-  SYSTEM: "H·ªá th·ªëng",
+  WAITING_OFFER: "–? xu?t t? phÚng ch?",
+  WAITING_REJECTED: "PhÚng ch? b? t? ch?i",
+  WAITING_EXPIRED: "Offer h?t h?n",
+  SYSTEM: "H? th?ng",
 };
 
 const typeTone: Record<NotificationItem["type"], string> = {
@@ -42,12 +42,13 @@ const extractText = (item: NotificationItem) => {
   const message =
     typeof messageCandidate === "string"
       ? messageCandidate
-      : "B·∫°n c√≥ m·ªôt c·∫≠p nh·∫≠t m·ªõi. Vui l√≤ng m·ªü trang li√™n quan ƒë·ªÉ xem chi ti·∫øt.";
+      : "B?n cÛ m?t c?p nh?t m?i. Vui lÚng m? trang liÍn quan d? xem chi ti?t.";
   return { title, message };
 };
 
 export const NotificationBell = () => {
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = async () => {
     const response = await fetch("/api/notifications/me");
@@ -71,9 +72,39 @@ export const NotificationBell = () => {
     });
     const payload = await response.json();
     if (payload.success) {
-      toast.success("ƒê√£ ƒë√°nh d·∫•u to√†n b·ªô th√¥ng b√°o ƒë√£ ƒë·ªçc");
+      toast.success("–„ d·nh d?u to‡n b? thÙng b·o d„ d?c");
       await load();
     }
+  };
+
+  const clearRead = async () => {
+    const response = await fetch("/api/notifications/read", {
+      method: "DELETE",
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      toast.error(payload.error?.message ?? "KhÙng th? xÛa thÙng b·o d„ d?c");
+      return;
+    }
+
+    toast.success(`–„ xÛa ${payload.data.deletedCount} thÙng b·o d„ d?c`);
+    await load();
+  };
+
+  const deleteOne = async (notificationId: string) => {
+    setDeletingId(notificationId);
+    const response = await fetch(`/api/notifications/${notificationId}`, {
+      method: "DELETE",
+    });
+    const payload = await response.json();
+    setDeletingId(null);
+
+    if (!response.ok || !payload.success) {
+      toast.error(payload.error?.message ?? "KhÙng th? xÛa thÙng b·o");
+      return;
+    }
+
+    setItems((prev) => prev.filter((item) => item.id !== notificationId));
   };
 
   return (
@@ -90,14 +121,19 @@ export const NotificationBell = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[360px]">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Th√¥ng b√°o</span>
-          <button className="text-primary text-xs hover:underline" type="button" onClick={() => void markRead()}>
-            ƒê√°nh d·∫•u ƒë√£ ƒë·ªçc
-          </button>
+          <span>ThÙng b·o</span>
+          <div className="flex items-center gap-3">
+            <button className="text-primary text-xs hover:underline" type="button" onClick={() => void markRead()}>
+              –·nh d?u d„ d?c
+            </button>
+            <button className="text-destructive text-xs hover:underline" type="button" onClick={() => void clearRead()}>
+              XÛa d„ d?c
+            </button>
+          </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {items.length === 0 ? (
-          <DropdownMenuItem disabled>Ch∆∞a c√≥ th√¥ng b√°o</DropdownMenuItem>
+          <DropdownMenuItem disabled>Chua cÛ thÙng b·o</DropdownMenuItem>
         ) : (
           items.slice(0, 12).map((item) => {
             const { title, message } = extractText(item);
@@ -106,7 +142,23 @@ export const NotificationBell = () => {
                 <div className={cn("w-full rounded-lg border p-2.5", typeTone[item.type])}>
                   <div className="mb-1 flex items-start justify-between gap-2">
                     <p className="text-[12px] font-semibold leading-tight">{title}</p>
-                    {!item.readAt ? <span className="mt-1 size-2 shrink-0 rounded-full bg-blue-500" /> : null}
+                    {!item.readAt ? (
+                      <span className="mt-1 size-2 shrink-0 rounded-full bg-blue-500" />
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground inline-flex size-5 items-center justify-center"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void deleteOne(item.id);
+                        }}
+                        disabled={deletingId === item.id}
+                        aria-label="XÛa thÙng b·o"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    )}
                   </div>
                   <p className="text-muted-foreground text-[12px] leading-relaxed">{message}</p>
                   <p className="text-muted-foreground mt-1 text-[11px]">

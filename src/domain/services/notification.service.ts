@@ -54,4 +54,25 @@ export const notificationService = {
         readAt: new Date(),
       },
     }),
+
+  deleteAllRead: async (userId: string) =>
+    prisma.notification.deleteMany({
+      where: {
+        userId,
+        readAt: {
+          not: null,
+        },
+      },
+    }),
+
+  deleteReadById: async (userId: string, notificationId: string) =>
+    prisma.notification.deleteMany({
+      where: {
+        id: notificationId,
+        userId,
+        readAt: {
+          not: null,
+        },
+      },
+    }),
 };
