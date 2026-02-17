@@ -17,7 +17,7 @@ export const AuthShell = ({
     <div className="pointer-events-none absolute right-[32%] top-[18%] h-48 w-48 rounded-full bg-indigo-300/25 blur-3xl" />
 
     <div className="glass-card panel-fade relative w-full max-w-md overflow-hidden p-7">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-r from-emerald-300/30 via-cyan-300/20 to-amber-200/20" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-emerald-300/35 via-cyan-300/20 to-transparent" />
       <div className="relative mb-6">
         <p className="text-primary mb-2 text-xs tracking-[0.2em] uppercase">UEH Registration Portal</p>
         <h1 className="font-display text-3xl leading-tight font-semibold tracking-tight text-slate-800">{title}</h1>
