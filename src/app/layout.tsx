@@ -10,7 +10,7 @@ const beViet = Be_Vietnam_Pro({
 });
 
 const mono = JetBrains_Mono({
-  variable: "--font-mono",
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 

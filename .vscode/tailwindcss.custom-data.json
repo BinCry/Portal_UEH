@@ -1,0 +1,53 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4 theme variable definitions."
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4 custom variant definitions."
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS custom utilities."
+    },
+    {
+      "name": "@variant",
+      "description": "Tailwind CSS variant nesting."
+    },
+    {
+      "name": "@source",
+      "description": "Tailwind CSS source scanning configuration."
+    },
+    {
+      "name": "@plugin",
+      "description": "Tailwind CSS plugin registration."
+    },
+    {
+      "name": "@config",
+      "description": "Tailwind CSS configuration file import."
+    },
+    {
+      "name": "@tailwind",
+      "description": "Tailwind CSS layer injection."
+    },
+    {
+      "name": "@apply",
+      "description": "Inline existing Tailwind utilities."
+    },
+    {
+      "name": "@layer",
+      "description": "Tailwind CSS layer declaration."
+    },
+    {
+      "name": "@screen",
+      "description": "Tailwind CSS responsive breakpoints."
+    },
+    {
+      "name": "@responsive",
+      "description": "Tailwind CSS responsive utility generation."
+    }
+  ]
+}
