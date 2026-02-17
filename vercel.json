@@ -1,16 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/jobs/sla-scan",
-      "schedule": "0 * * * *"
-    },
-    {
-      "path": "/api/jobs/match-offers",
-      "schedule": "10 * * * *"
-    },
-    {
-      "path": "/api/jobs/expire-offers",
-      "schedule": "20 * * * *"
-    }
-  ]
-}
+{}
