@@ -35,6 +35,7 @@ Các biến bắt buộc:
 - `NEXTAUTH_URL` (nên để `http://localhost:3000`)
 - `NEXTAUTH_SECRET`
 - `CRON_SECRET`
+- `HISTORY_RETENTION_DAYS` (optional, default `2`)
 
 ## Chạy local (PowerShell Windows)
 
@@ -93,6 +94,7 @@ Nếu e2e báo thiếu browser:
   - `/api/jobs/sla-scan`
   - `/api/jobs/match-offers`
   - `/api/jobs/expire-offers`
+  - `/api/jobs/cleanup-history`
 
 ## API response format
 

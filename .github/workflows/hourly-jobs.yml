@@ -45,3 +45,10 @@ jobs:
             -X POST "${BASE_URL}/api/jobs/expire-offers" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json"
+
+      - name: Cleanup old history
+        run: |
+          curl --fail-with-body --show-error --silent --retry 2 --retry-delay 3 --retry-connrefused \
+            -X POST "${BASE_URL}/api/jobs/cleanup-history" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json"
