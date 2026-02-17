@@ -194,22 +194,24 @@ export const waitingEntryService = {
     const roomIds = [...new Set(entries.map((entry) => entry.waitingRoomId))];
     const queueMap = new Map<string, string[]>();
 
-    await Promise.all(
-      roomIds.map(async (roomId) => {
-        const queue = await prisma.waitingEntry.findMany({
-          where: {
-            waitingRoomId: roomId,
-            state: WaitingEntryState.QUEUED,
+    if (roomIds.length) {
+      const allQueuedEntries = await prisma.waitingEntry.findMany({
+        where: {
+          waitingRoomId: {
+            in: roomIds,
           },
-          orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
-          select: { id: true },
-        });
-        queueMap.set(
-          roomId,
-          queue.map((item) => item.id),
-        );
-      }),
-    );
+          state: WaitingEntryState.QUEUED,
+        },
+        orderBy: [{ waitingRoomId: "asc" }, { joinedAt: "asc" }, { id: "asc" }],
+        select: { id: true, waitingRoomId: true },
+      });
+
+      for (const item of allQueuedEntries) {
+        const roomQueue = queueMap.get(item.waitingRoomId) ?? [];
+        roomQueue.push(item.id);
+        queueMap.set(item.waitingRoomId, roomQueue);
+      }
+    }
 
     return entries.map((entry) => ({
       ...entry,
