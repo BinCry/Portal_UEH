@@ -1,4 +1,4 @@
-"use client";
+Ôªø"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { Bell, X } from "lucide-react";
@@ -23,8 +23,8 @@ type NotificationItem = {
 };
 
 const typeLabel: Record<NotificationItem["type"], string> = {
-  WAITING_OFFER: "–? xu?t t? phÚng ch?",
-  WAITING_REJECTED: "PhÚng ch? b? t? ch?i",
+  WAITING_OFFER: "√ê? xu?t t? ph√≤ng ch?",
+  WAITING_REJECTED: "Ph√≤ng ch? b? t? ch?i",
   WAITING_EXPIRED: "Offer h?t h?n",
   SYSTEM: "H? th?ng",
 };
@@ -42,7 +42,7 @@ const extractText = (item: NotificationItem) => {
   const message =
     typeof messageCandidate === "string"
       ? messageCandidate
-      : "B?n cÛ m?t c?p nh?t m?i. Vui lÚng m? trang liÍn quan d? xem chi ti?t.";
+      : "B?n c√≥ m?t c?p nh?t m?i. Vui l√≤ng m? trang li√™n quan d? xem chi ti?t.";
   return { title, message };
 };
 
@@ -72,7 +72,7 @@ export const NotificationBell = () => {
     });
     const payload = await response.json();
     if (payload.success) {
-      toast.success("–„ d·nh d?u to‡n b? thÙng b·o d„ d?c");
+      toast.success("√ê√£ d√°nh d?u to√†n b? th√¥ng b√°o d√£ d?c");
       await load();
     }
   };
@@ -83,11 +83,11 @@ export const NotificationBell = () => {
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "KhÙng th? xÛa thÙng b·o d„ d?c");
+      toast.error(payload.error?.message ?? "Kh√¥ng th? x√≥a th√¥ng b√°o d√£ d?c");
       return;
     }
 
-    toast.success(`–„ xÛa ${payload.data.deletedCount} thÙng b·o d„ d?c`);
+    toast.success(`√ê√£ x√≥a ${payload.data.deletedCount} th√¥ng b√°o d√£ d?c`);
     await load();
   };
 
@@ -100,7 +100,7 @@ export const NotificationBell = () => {
     setDeletingId(null);
 
     if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "KhÙng th? xÛa thÙng b·o");
+      toast.error(payload.error?.message ?? "Kh√¥ng th? x√≥a th√¥ng b√°o");
       return;
     }
 
@@ -121,19 +121,19 @@ export const NotificationBell = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[360px]">
         <DropdownMenuLabel className="flex items-center justify-between">
-          <span>ThÙng b·o</span>
+          <span>Th√¥ng b√°o</span>
           <div className="flex items-center gap-3">
             <button className="text-primary text-xs hover:underline" type="button" onClick={() => void markRead()}>
-              –·nh d?u d„ d?c
+              √ê√°nh d?u d√£ d?c
             </button>
             <button className="text-destructive text-xs hover:underline" type="button" onClick={() => void clearRead()}>
-              XÛa d„ d?c
+              X√≥a d√£ d?c
             </button>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {items.length === 0 ? (
-          <DropdownMenuItem disabled>Chua cÛ thÙng b·o</DropdownMenuItem>
+          <DropdownMenuItem disabled>Chua c√≥ th√¥ng b√°o</DropdownMenuItem>
         ) : (
           items.slice(0, 12).map((item) => {
             const { title, message } = extractText(item);
@@ -154,7 +154,7 @@ export const NotificationBell = () => {
                           void deleteOne(item.id);
                         }}
                         disabled={deletingId === item.id}
-                        aria-label="XÛa thÙng b·o"
+                        aria-label="X√≥a th√¥ng b√°o"
                       >
                         <X className="size-3.5" />
                       </button>
@@ -173,3 +173,4 @@ export const NotificationBell = () => {
     </DropdownMenu>
   );
 };
+
