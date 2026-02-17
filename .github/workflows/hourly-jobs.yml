@@ -9,35 +9,39 @@ jobs:
   run-jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      APP_BASE_URL: ${{ vars.APP_BASE_URL || secrets.APP_BASE_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
-      - name: Validate required secrets
+      - name: Validate required config
         run: |
-          if [ -z "${{ secrets.APP_BASE_URL }}" ]; then
-            echo "Missing APP_BASE_URL secret"
+          if [ -z "${APP_BASE_URL}" ]; then
+            echo "Missing APP_BASE_URL (set Repository Variable APP_BASE_URL or Secret APP_BASE_URL)"
             exit 1
           fi
-          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+          if [ -z "${CRON_SECRET}" ]; then
             echo "Missing CRON_SECRET secret"
             exit 1
           fi
+          echo "BASE_URL=${APP_BASE_URL%/}" >> "$GITHUB_ENV"
 
       - name: Run SLA scan
         run: |
-          curl --fail-with-body --show-error --silent \
-            -X POST "${{ secrets.APP_BASE_URL }}/api/jobs/sla-scan" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl --fail-with-body --show-error --silent --retry 2 --retry-delay 3 --retry-connrefused \
+            -X POST "${BASE_URL}/api/jobs/sla-scan" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json"
 
       - name: Run match offers
         run: |
-          curl --fail-with-body --show-error --silent \
-            -X POST "${{ secrets.APP_BASE_URL }}/api/jobs/match-offers" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl --fail-with-body --show-error --silent --retry 2 --retry-delay 3 --retry-connrefused \
+            -X POST "${BASE_URL}/api/jobs/match-offers" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json"
 
       - name: Run expire offers
         run: |
-          curl --fail-with-body --show-error --silent \
-            -X POST "${{ secrets.APP_BASE_URL }}/api/jobs/expire-offers" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+          curl --fail-with-body --show-error --silent --retry 2 --retry-delay 3 --retry-connrefused \
+            -X POST "${BASE_URL}/api/jobs/expire-offers" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json"
