@@ -60,7 +60,11 @@ export const NotificationBell = () => {
 
   useEffect(() => {
     void load();
-    const id = window.setInterval(() => void load(), 30_000);
+    const id = window.setInterval(() => {
+      if (!document.hidden) {
+        void load();
+      }
+    }, 60_000);
     return () => window.clearInterval(id);
   }, []);
 

@@ -42,6 +42,7 @@ export const PortalShell = ({
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 "block rounded-xl px-3 py-2 text-sm font-medium transition duration-200",
                 isActive(item.href)
@@ -71,6 +72,7 @@ export const PortalShell = ({
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 "whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition",
                 isActive(item.href) ? "rainbow-chip" : "bg-background/70 hover:bg-cyan-50",
