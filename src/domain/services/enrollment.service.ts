@@ -170,15 +170,15 @@ export const enrollmentService = {
 
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
-        title: "Da xac nhan lop tu phong cho",
-        message: "Ban da xac nhan lan cuoi thanh cong. Hoc phan da duoc ghi nhan vao hoc vu va tai chinh.",
+        title: "Đã xác nhận lớp từ phòng chờ",
+        message: "Bạn đã xác nhận lần cuối thành công. Học phần đã được ghi nhận vào học vụ và tài chính.",
         waitingEntryId: result.entry.id,
         waitingRoomId: result.entry.waitingRoomId,
         sectionId: result.entry.offerSectionId,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "Sinh vien da xac nhan lop phong cho",
-        message: `Sinh vien da xac nhan offer phong cho cho hoc phan ${result.entry.waitingRoom.course.code}.`,
+        title: "Sinh viên đã xác nhận lớp phòng chờ",
+        message: `Sinh viên đã xác nhận offer phòng chờ cho học phần ${result.entry.waitingRoom.course.code}.`,
         waitingEntryId: result.entry.id,
         waitingRoomId: result.entry.waitingRoomId,
         sectionId: result.entry.offerSectionId,
@@ -255,11 +255,11 @@ export const enrollmentService = {
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
         title: isPriorityOneDecline
-          ? "Canh bao: ban da tu choi de xuat uu tien 1"
-          : "Ban da tu choi de xuat uu tien 2/3",
+          ? "Cảnh báo: bạn đã từ chối đề xuất ưu tiên 1"
+          : "Bạn đã từ chối đề xuất ưu tiên 2/3",
         message: isPriorityOneDecline
-          ? `Ban se bi khoa quyen tham gia phong cho den ${blockedUntil?.toLocaleString("vi-VN")}.`
-          : `Ban bi mat quyen uu tien tam thoi den ${priorityPenaltyUntil?.toLocaleString("vi-VN")}.`,
+          ? `Bạn sẽ bị khóa quyền tham gia phòng chờ đến ${blockedUntil?.toLocaleString("vi-VN")}.`
+          : `Bạn bị mất quyền ưu tiên tạm thời đến ${priorityPenaltyUntil?.toLocaleString("vi-VN")}.`,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
         matchedPriority,
@@ -267,10 +267,10 @@ export const enrollmentService = {
         priorityPenaltyUntil: priorityPenaltyUntil?.toISOString() ?? null,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "Sinh vien tu choi offer phong cho",
+        title: "Sinh viên từ chối offer phòng chờ",
         message: isPriorityOneDecline
-          ? `Sinh vien vua tu choi de xuat uu tien 1 cua hoc phan ${entry.waitingRoom.course.code}. Da khoa quyen phong cho hoc ky ke tiep.`
-          : `Sinh vien vua tu choi de xuat uu tien ${matchedPriority} cua hoc phan ${entry.waitingRoom.course.code}. Da ap dung mat quyen uu tien tam thoi.`,
+          ? `Sinh viên vừa từ chối đề xuất ưu tiên 1 của học phần ${entry.waitingRoom.course.code}. Đã khóa quyền phòng chờ học kỳ kế tiếp.`
+          : `Sinh viên vừa từ chối đề xuất ưu tiên ${matchedPriority} của học phần ${entry.waitingRoom.course.code}. Đã áp dụng mất quyền ưu tiên tạm thời.`,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
         studentId,
@@ -327,8 +327,8 @@ export const enrollmentService = {
       });
 
       await notificationService.create(entry.studentId, NotificationType.WAITING_EXPIRED, {
-        title: "Offer phong cho da het han",
-        message: "Ban chua xac nhan lan cuoi trong 24 gio nen offer da het hieu luc.",
+        title: "Offer phòng chờ đã hết hạn",
+        message: "Bạn chưa xác nhận lần cuối trong 24 giờ nên offer đã hết hiệu lực.",
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
       });
@@ -339,8 +339,8 @@ export const enrollmentService = {
 
     if (expiredEntries.length) {
       await notificationService.createForAdmins("SYSTEM", {
-        title: "Co offer phong cho het han",
-        message: `Co ${expiredEntries.length} offer da het han va he thong da tu dong chuyen suat cho hang doi tiep theo.`,
+        title: "Có offer phòng chờ hết hạn",
+        message: `Có ${expiredEntries.length} offer đã hết hạn và hệ thống đã tự động chuyển suất cho hàng đợi tiếp theo.`,
         expiredCount: expiredEntries.length,
         waitingRoomIds: [...touchedRooms],
       });
@@ -349,4 +349,3 @@ export const enrollmentService = {
     return { expiredCount: expiredEntries.length };
   },
 };
-

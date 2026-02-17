@@ -16,9 +16,9 @@ const activeEntryStates: WaitingEntryState[] = [
 
 const toOfferMessage = (matchedPriority: number | null, sectionCode: string | null) => {
   if (matchedPriority === 1) {
-    return `Admin da duyet de xuat uu tien 1 (${sectionCode ?? "lop bo sung"}). Vui long xac nhan lan cuoi trong 24 gio.`;
+    return `Admin đã duyệt đề xuất ưu tiên 1 (${sectionCode ?? "lớp bổ sung"}). Vui lòng xác nhận lần cuối trong 24 giờ.`;
   }
-  return `Uu tien 1 hien da het cho. Admin da duyet de xuat uu tien ${matchedPriority ?? "-"} (${sectionCode ?? "lop bo sung"}). Vui long xac nhan lan cuoi trong 24 gio.`;
+  return `Ưu tiên 1 hiện đã hết chỗ. Admin đã duyệt đề xuất ưu tiên ${matchedPriority ?? "-"} (${sectionCode ?? "lớp bổ sung"}). Vui lòng xác nhận lần cuối trong 24 giờ.`;
 };
 
 const autoApprovePendingEntriesForRoom = async (waitingRoomId: string) => {
@@ -53,12 +53,12 @@ const autoApprovePendingEntriesForRoom = async (waitingRoomId: string) => {
         state: WaitingEntryState.OFFERED,
         expiresAt,
         lastNotifiedAt: now(),
-        reason: "He thong tu dong phe duyet de xuat qua SLA",
+        reason: "Hệ thống tự động phê duyệt đề xuất quá SLA",
       },
     });
 
     await notificationService.create(entry.studentId, NotificationType.WAITING_OFFER, {
-      title: "Da co de xuat lop tu phong cho",
+      title: "Đã có đề xuất lớp từ phòng chờ",
       message: toOfferMessage(entry.matchedPriority, entry.offerSection?.code ?? null),
       waitingEntryId: entry.id,
       waitingRoomId: entry.waitingRoomId,
@@ -88,7 +88,7 @@ export const approvalService = {
             data: {
               status: ApprovalStatus.APPROVED,
               approvedById,
-              reason: reason ?? "Phe duyet thu cong",
+              reason: reason ?? "Phê duyệt thủ công",
             },
           })
         : await tx.approval.create({
@@ -96,7 +96,7 @@ export const approvalService = {
               waitingRoomId,
               status: ApprovalStatus.APPROVED,
               approvedById,
-              reason: reason ?? "Phe duyet thu cong",
+              reason: reason ?? "Phê duyệt thủ công",
               dueAt: now(),
             },
           });
@@ -131,9 +131,9 @@ export const approvalService = {
         entries.map((entry) => entry.studentId),
         "SYSTEM",
         {
-          title: "Phong cho da duoc phe duyet",
+          title: "Phòng chờ đã được phê duyệt",
           message:
-            "Phong dao tao da phe duyet phong cho. He thong dang map nguyen vong va gui tung de xuat de admin duyet cuoi.",
+            "Phòng đào tạo đã phê duyệt phòng chờ. Hệ thống đang map nguyện vọng và gửi từng đề xuất để admin duyệt cuối.",
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -143,8 +143,8 @@ export const approvalService = {
       await notificationService.createForAdmins(
         "SYSTEM",
         {
-          title: "Da phe duyet phong cho",
-          message: `Phong cho hoc phan ${room.course.code} da duoc phe duyet.`,
+          title: "Đã phê duyệt phòng chờ",
+          message: `Phòng chờ học phần ${room.course.code} đã được phê duyệt.`,
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -157,8 +157,8 @@ export const approvalService = {
     const matchResult = await matchingService.matchWaitingRoom(waitingRoomId);
     if (room) {
       await notificationService.createForAdmins("SYSTEM", {
-        title: "Ket qua map hang doi",
-        message: `Hoc phan ${room.course.code}: ${matchResult.pendingAdmin} de xuat dang cho admin duyet, ${matchResult.failed} khong phan duoc.`,
+        title: "Kết quả map hàng đợi",
+        message: `Học phần ${room.course.code}: ${matchResult.pendingAdmin} đề xuất đang chờ admin duyệt, ${matchResult.failed} không phân được.`,
         waitingRoomId,
         courseCode: room.course.code,
         pendingAdmin: matchResult.pendingAdmin,
@@ -259,7 +259,7 @@ export const approvalService = {
       entries.map((entry) => entry.studentId),
       "WAITING_REJECTED",
       {
-        title: "Phong cho da bi tu choi",
+        title: "Phòng chờ đã bị từ chối",
         message: reason,
         waitingRoomId,
       },
@@ -269,8 +269,8 @@ export const approvalService = {
       await notificationService.createForAdmins(
         "SYSTEM",
         {
-          title: "Da tu choi phong cho",
-          message: `Phong cho hoc phan ${room.course.code} da bi tu choi.`,
+          title: "Đã từ chối phòng chờ",
+          message: `Phòng chờ học phần ${room.course.code} đã bị từ chối.`,
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -319,7 +319,7 @@ export const approvalService = {
         data: {
           state: WaitingEntryState.OFFERED,
           expiresAt,
-          reason: reason ?? target.reason ?? "Admin da duyet de xuat",
+          reason: reason ?? target.reason ?? "Admin đã duyệt đề xuất",
           lastNotifiedAt: now(),
         },
         include: {
@@ -339,7 +339,7 @@ export const approvalService = {
 
     await Promise.all([
       notificationService.create(entry.studentId, NotificationType.WAITING_OFFER, {
-        title: "Admin da duyet de xuat phong cho",
+        title: "Admin đã duyệt đề xuất phòng chờ",
         message: toOfferMessage(entry.matchedPriority, entry.offerSection?.code ?? null),
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
@@ -352,8 +352,8 @@ export const approvalService = {
       notificationService.createForAdmins(
         NotificationType.SYSTEM,
         {
-          title: "Da duyet de xuat cho sinh vien",
-          message: `Entry ${entry.id} da duoc duyet va gui cho sinh vien xac nhan lan cuoi.`,
+          title: "Đã duyệt đề xuất cho sinh viên",
+          message: `Entry ${entry.id} đã được duyệt và gửi cho sinh viên xác nhận lần cuối.`,
           waitingEntryId: entry.id,
           waitingRoomId: entry.waitingRoomId,
           sectionId: entry.offerSection?.id ?? null,
@@ -418,7 +418,7 @@ export const approvalService = {
 
     await Promise.all([
       notificationService.create(entry.studentId, NotificationType.WAITING_REJECTED, {
-        title: "De xuat phong cho da bi tu choi",
+        title: "Đề xuất phòng chờ đã bị từ chối",
         message: reason,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
@@ -427,8 +427,8 @@ export const approvalService = {
       notificationService.createForAdmins(
         NotificationType.SYSTEM,
         {
-          title: "Da tu choi de xuat cho sinh vien",
-          message: `Entry ${entry.id} da bi tu choi. He thong se phan bo lai suat cho hang doi tiep theo.`,
+          title: "Đã từ chối đề xuất cho sinh viên",
+          message: `Entry ${entry.id} đã bị từ chối. Hệ thống sẽ phân bổ lại suất cho hàng đợi tiếp theo.`,
           waitingEntryId: entry.id,
           waitingRoomId: entry.waitingRoomId,
           sectionId: entry.offerSectionId,
@@ -491,7 +491,7 @@ export const approvalService = {
           where: { id: approval.id },
           data: {
             status: ApprovalStatus.AUTO_APPROVED,
-            reason: "Qua SLA 48h va he thong tu dong phe duyet",
+            reason: "Quá SLA 48h và hệ thống tự động phê duyệt",
           },
         });
 
@@ -499,9 +499,9 @@ export const approvalService = {
           approval.waitingRoom.entries.map((entry) => entry.studentId),
           "SYSTEM",
           {
-            title: "Phong cho duoc tu dong phe duyet",
+            title: "Phòng chờ được tự động phê duyệt",
             message:
-              "Phong cho da qua SLA 48h nen he thong tu dong phe duyet va se tiep tuc xu ly de xuat lop.",
+              "Phòng chờ đã quá SLA 48h nên hệ thống tự động phê duyệt và sẽ tiếp tục xử lý đề xuất lớp.",
             waitingRoomId: approval.waitingRoomId,
             courseCode: approval.waitingRoom.course.code,
             requiresFinalConfirmation: true,
@@ -512,8 +512,8 @@ export const approvalService = {
         const autoOffered = await autoApprovePendingEntriesForRoom(approval.waitingRoomId);
 
         await notificationService.createForAdmins("SYSTEM", {
-          title: "SLA tu dong phe duyet phong cho",
-          message: `Hoc phan ${approval.waitingRoom.course.code}: ${autoOffered} de xuat da gui cho sinh vien xac nhan, ${matchResult.failed} chua phan duoc.`,
+          title: "SLA tự động phê duyệt phòng chờ",
+          message: `Học phần ${approval.waitingRoom.course.code}: ${autoOffered} đề xuất đã gửi cho sinh viên xác nhận, ${matchResult.failed} chưa phân được.`,
           waitingRoomId: approval.waitingRoomId,
           courseCode: approval.waitingRoom.course.code,
           autoOffered,
@@ -522,7 +522,7 @@ export const approvalService = {
         });
         autoApproved += 1;
       } else {
-        const reason = "Qua SLA 48h nhung khong con slot kha dung";
+        const reason = "Quá SLA 48h nhưng không còn slot khả dụng";
         await prisma.$transaction(async (tx) => {
           await tx.approval.update({
             where: { id: approval.id },
@@ -569,15 +569,15 @@ export const approvalService = {
           approval.waitingRoom.entries.map((entry) => entry.studentId),
           "WAITING_REJECTED",
           {
-            title: "Phong cho bi tu choi do qua SLA",
+            title: "Phòng chờ bị từ chối do quá SLA",
             message: reason,
             waitingRoomId: approval.waitingRoomId,
             courseCode: approval.waitingRoom.course.code,
           },
         );
         await notificationService.createForAdmins("SYSTEM", {
-          title: "SLA tu dong tu choi phong cho",
-          message: `Hoc phan ${approval.waitingRoom.course.code} da bi tu choi vi khong con slot kha dung.`,
+          title: "SLA tự động từ chối phòng chờ",
+          message: `Học phần ${approval.waitingRoom.course.code} đã bị từ chối vì không còn slot khả dụng.`,
           waitingRoomId: approval.waitingRoomId,
           courseCode: approval.waitingRoom.course.code,
         });

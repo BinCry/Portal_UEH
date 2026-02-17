@@ -127,7 +127,7 @@ export const waitingEntryService = {
         prioritiesJson: priorities as unknown as Prisma.JsonArray,
         state: WaitingEntryState.QUEUED,
         reason: priorityPenaltyActive
-          ? `Dang mat quyen uu tien tam thoi den ${studentProfile.priorityPenaltyUntil?.toLocaleString("vi-VN")}`
+          ? `Đang mất quyền ưu tiên tạm thời đến ${studentProfile.priorityPenaltyUntil?.toLocaleString("vi-VN")}`
           : null,
       },
     });
@@ -136,10 +136,10 @@ export const waitingEntryService = {
 
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
-        title: "Da ghi nhan yeu cau phong cho",
+        title: "Đã ghi nhận yêu cầu phòng chờ",
         message: priorityPenaltyActive
-          ? `Ban da tham gia phong cho hoc phan ${course.code}. Vi dang mat quyen uu tien tam thoi, he thong se bo qua uu tien 1 khi matching. Vi tri FIFO hien tai: #${position}.`
-          : `Ban da tham gia phong cho hoc phan ${course.code}. Vi tri FIFO hien tai: #${position}.`,
+          ? `Bạn đã tham gia phòng chờ học phần ${course.code}. Vì đang mất quyền ưu tiên tạm thời, hệ thống sẽ bỏ qua ưu tiên 1 khi matching. Vị trí FIFO hiện tại: #${position}.`
+          : `Bạn đã tham gia phòng chờ học phần ${course.code}. Vị trí FIFO hiện tại: #${position}.`,
         waitingEntryId: entry.id,
         waitingRoomId: room.id,
         courseCode: course.code,
@@ -148,8 +148,8 @@ export const waitingEntryService = {
         priorityPenaltyUntil: studentProfile.priorityPenaltyUntil?.toISOString() ?? null,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "Co yeu cau phong cho moi",
-        message: `${studentProfile.fullName} (${studentProfile.studentCode}) vua tham gia phong cho hoc phan ${course.code}.`,
+        title: "Có yêu cầu phòng chờ mới",
+        message: `${studentProfile.fullName} (${studentProfile.studentCode}) vừa tham gia phòng chờ học phần ${course.code}.`,
         waitingEntryId: entry.id,
         waitingRoomId: room.id,
         studentId,

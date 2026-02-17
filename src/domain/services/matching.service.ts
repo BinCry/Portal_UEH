@@ -65,12 +65,12 @@ export const matchingService = {
           where: { id: entry.id },
           data: {
             state: WaitingEntryState.FAILED,
-            reason: "Khong co nguyen vong hop le",
+            reason: "Không có nguyện vọng hợp lệ",
           },
         });
         await notificationService.create(entry.studentId, "SYSTEM", {
-          title: "Phong cho chua the cap lop",
-          message: `Yeu cau phong cho hoc phan ${entry.waitingRoom.course.code} chua co nguyen vong hop le.`,
+          title: "Phòng chờ chưa thể cấp lớp",
+          message: `Yêu cầu phòng chờ học phần ${entry.waitingRoom.course.code} chưa có nguyện vọng hợp lệ.`,
           waitingEntryId: entry.id,
           waitingRoomId,
         });
@@ -86,13 +86,13 @@ export const matchingService = {
           where: { id: entry.id },
           data: {
             state: WaitingEntryState.FAILED,
-            reason: "Dang tam mat quyen uu tien, vui long cap nhat lai nguyen vong",
+            reason: "Đang tạm mất quyền ưu tiên, vui lòng cập nhật lại nguyện vọng",
           },
         });
         await notificationService.create(entry.studentId, "SYSTEM", {
-          title: "Phong cho chua the cap lop",
+          title: "Phòng chờ chưa thể cấp lớp",
           message:
-            "Ban dang bi mat quyen uu tien tam thoi, he thong chua the xet nguyen vong hien tai. Vui long cap nhat lai danh sach uu tien.",
+            "Bạn đang bị mất quyền ưu tiên tạm thời, hệ thống chưa thể xét nguyện vọng hiện tại. Vui lòng cập nhật lại danh sách ưu tiên.",
           waitingEntryId: entry.id,
           waitingRoomId,
         });
@@ -154,13 +154,13 @@ export const matchingService = {
           where: { id: entry.id },
           data: {
             state: WaitingEntryState.FAILED,
-            reason: "Khong tim thay lop bo sung phu hop theo nguyen vong",
+            reason: "Không tìm thấy lớp bổ sung phù hợp theo nguyện vọng",
           },
         });
         await notificationService.create(entry.studentId, "SYSTEM", {
-          title: "Phong cho chua the cap lop",
+          title: "Phòng chờ chưa thể cấp lớp",
           message:
-            "Chua tim duoc lop bo sung phu hop theo 3 nguyen vong cua ban. Ban co the cap nhat nguyen vong hoac cho dot tiep theo.",
+            "Chưa tìm được lớp bổ sung phù hợp theo 3 nguyện vọng của bạn. Bạn có thể cập nhật nguyện vọng hoặc chờ đợt tiếp theo.",
           waitingEntryId: entry.id,
           waitingRoomId,
           courseCode: entry.waitingRoom.course.code,
@@ -180,18 +180,18 @@ export const matchingService = {
           lastNotifiedAt: now(),
           reason:
             matchedPriority === 1
-              ? "He thong de xuat theo uu tien 1, cho admin duyet"
-              : `Uu tien 1 het cho, de xuat theo uu tien ${matchedPriority}, cho admin duyet`,
+              ? "Hệ thống đề xuất theo ưu tiên 1, chờ admin duyệt"
+              : `Ưu tiên 1 hết chỗ, đề xuất theo ưu tiên ${matchedPriority}, chờ admin duyệt`,
         },
       });
 
       await Promise.all([
         notificationService.create(entry.studentId, NotificationType.SYSTEM, {
-          title: "Da tim thay lop bo sung, dang cho admin duyet",
+          title: "Đã tìm thấy lớp bổ sung, đang chờ admin duyệt",
           message:
             matchedPriority === 1
-              ? `He thong da tim thay lop ${assignedSectionCode ?? assignedSectionId} theo uu tien 1. Vui long cho admin duyet.`
-              : `Uu tien 1 hien da het cho. He thong de xuat lop ${assignedSectionCode ?? assignedSectionId} theo uu tien ${matchedPriority} va dang cho admin duyet.`,
+              ? `Hệ thống đã tìm thấy lớp ${assignedSectionCode ?? assignedSectionId} theo ưu tiên 1. Vui lòng chờ admin duyệt.`
+              : `Ưu tiên 1 hiện đã hết chỗ. Hệ thống đề xuất lớp ${assignedSectionCode ?? assignedSectionId} theo ưu tiên ${matchedPriority} và đang chờ admin duyệt.`,
           waitingEntryId: entry.id,
           waitingRoomId,
           sectionId: assignedSectionId,
@@ -200,10 +200,10 @@ export const matchingService = {
           pendingAdminReview: true,
         }),
         notificationService.createForAdmins(NotificationType.SYSTEM, {
-          title: "Can duyet de xuat phong cho",
-          message: `${entry.student.studentProfile?.fullName ?? entry.student.email} dang cho duyet de xuat lop ${
+          title: "Cần duyệt đề xuất phòng chờ",
+          message: `${entry.student.studentProfile?.fullName ?? entry.student.email} đang chờ duyệt đề xuất lớp ${
             assignedSectionCode ?? assignedSectionId
-          } (uu tien ${matchedPriority}) cho hoc phan ${entry.waitingRoom.course.code}.`,
+          } (ưu tiên ${matchedPriority}) cho học phần ${entry.waitingRoom.course.code}.`,
           waitingEntryId: entry.id,
           waitingRoomId,
           studentId: entry.studentId,
