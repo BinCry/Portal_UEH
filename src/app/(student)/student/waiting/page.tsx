@@ -1,21 +1,27 @@
-﻿import { PageTransition } from "@/components/shared/page-transition";
-import { WaitingHistory } from "@/components/student/waiting-history";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WaitingRoomRegistration } from "@/components/student/waiting-room-registration";
 import { requireRole } from "@/lib/auth";
 
 export default async function StudentWaitingPage() {
-  await requireRole("STUDENT");
+  const session = await requireRole("STUDENT");
 
   return (
-    <PageTransition>
-      <Card className="glass-card border-cyan-200/80">
-        <CardHeader>
-          <CardTitle>Lịch sử đăng ký học phần (trực tiếp + phòng chờ)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <WaitingHistory />
-        </CardContent>
-      </Card>
-    </PageTransition>
+    <div className="min-h-[calc(100vh-4rem)] bg-[#f8f9fa]">
+      <header className="w-full bg-[#005f69] px-5 py-4 text-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <div>
+            <p className="text-sm opacity-80">UEH Portal</p>
+            <h1 className="text-xl font-bold tracking-wide">ĐĂNG KÝ PHÒNG CHỜ</h1>
+          </div>
+          <div className="text-right text-sm">
+            <p className="font-semibold">Sinh viên</p>
+            <p className="opacity-90">{session.user.email}</p>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-4 py-6">
+        <WaitingRoomRegistration />
+      </main>
+    </div>
   );
 }

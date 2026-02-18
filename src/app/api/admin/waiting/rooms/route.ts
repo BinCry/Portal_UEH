@@ -41,7 +41,7 @@ export async function GET() {
         entries: {
           where: {
             state: {
-              in: [WaitingEntryState.PENDING_ADMIN],
+              in: [WaitingEntryState.QUEUED, WaitingEntryState.PENDING_ADMIN, WaitingEntryState.OFFERED],
             },
           },
           select: {
@@ -106,23 +106,32 @@ export async function GET() {
     const waitingCountMap = new Map(waitingCountRows.map((row) => [row.waitingRoomId, row._count._all]));
 
     return ok(
-      rooms.map((room) => ({
-        ...room,
-        waitingCount: waitingCountMap.get(room.id) ?? 0,
-        pendingApproval: room.approvals.find((approval) => approval.status === ApprovalStatus.PENDING) ?? null,
-        latestApproval: room.approvals[0] ?? null,
-        pendingEntries: room.entries.map((entry) => ({
-          id: entry.id,
-          studentId: entry.studentId,
-          studentName: entry.student.studentProfile?.fullName ?? entry.student.email,
-          studentCode: entry.student.studentProfile?.studentCode ?? null,
-          state: entry.state,
-          joinedAt: entry.joinedAt,
-          matchedPriority: entry.matchedPriority,
-          reason: entry.reason,
-          offerSection: entry.offerSection,
-        })),
-      })),
+      rooms.map((room) => {
+        const demandEntries = room.entries
+          .slice()
+          .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime())
+          .map((entry, index) => ({
+            id: entry.id,
+            studentId: entry.studentId,
+            studentName: entry.student.studentProfile?.fullName ?? entry.student.email,
+            studentCode: entry.student.studentProfile?.studentCode ?? null,
+            state: entry.state,
+            joinedAt: entry.joinedAt,
+            fifoPosition: index + 1,
+            matchedPriority: entry.matchedPriority,
+            reason: entry.reason,
+            offerSection: entry.offerSection,
+          }));
+
+        return {
+          ...room,
+          waitingCount: waitingCountMap.get(room.id) ?? 0,
+          pendingApproval: room.approvals.find((approval) => approval.status === ApprovalStatus.PENDING) ?? null,
+          latestApproval: room.approvals[0] ?? null,
+          pendingEntries: demandEntries.filter((entry) => entry.state === WaitingEntryState.PENDING_ADMIN),
+          demandEntries,
+        };
+      }),
     );
   });
 }
