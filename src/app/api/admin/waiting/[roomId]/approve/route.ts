@@ -46,7 +46,7 @@ export async function POST(request: Request, context: Context) {
     return fail(
       {
         code: "APPROVE_FAILED",
-        message: "KhÃ´ng thá»ƒ phÃª duyá»‡t phÃ²ng chá»",
+        message: "Không thể phê duyệt phòng chờ",
         details: error,
       },
       400,

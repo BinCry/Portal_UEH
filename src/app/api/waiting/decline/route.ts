@@ -15,12 +15,12 @@ export async function POST(request: Request) {
     try {
       const body = await parseBody(request, waitingDecisionSchema);
       await enrollmentService.declineWaitingOffer(auth.user.id, body.waitingEntryId);
-      return ok({ message: "Ðã t? ch?i offer" });
+      return ok({ message: "Đã từ chối offer" });
     } catch (error) {
       return fail(
         {
           code: "DECLINE_FAILED",
-          message: error instanceof Error ? error.message : "Không th? t? ch?i offer",
+          message: error instanceof Error ? error.message : "Không thể từ chối offer",
         },
         400,
       );

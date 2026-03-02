@@ -1,10 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type CourseItem = {
@@ -22,51 +19,6 @@ type CourseItem = {
   };
 };
 
-const CourseTable = ({ courses }: { courses: CourseItem[] }) => {
-  if (!courses.length) {
-    return <p className="text-muted-foreground text-sm">Chưa có học phần khả dụng.</p>;
-  }
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Mã HP</TableHead>
-          <TableHead>Tên học phần</TableHead>
-          <TableHead>Ngành</TableHead>
-          <TableHead>Tín chỉ</TableHead>
-          <TableHead>Số LHP</TableHead>
-          <TableHead>Phòng chờ</TableHead>
-          <TableHead className="text-right">Đăng ký</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {courses.map((course) => (
-          <TableRow key={course.id}>
-            <TableCell>{course.code}</TableCell>
-            <TableCell>{course.name}</TableCell>
-            <TableCell>
-              <Badge variant="outline">{course.faculty}</Badge>
-            </TableCell>
-            <TableCell>{course.credits}</TableCell>
-            <TableCell>{course._count.sections}</TableCell>
-            <TableCell>
-              <Badge variant={course.waitingRoom?.isActive ? "default" : "secondary"}>
-                {course.waitingRoom?.isActive ? "Đang mở" : "Chưa mở"}
-              </Badge>
-            </TableCell>
-            <TableCell className="text-right">
-              <Button className="primary-glow" asChild>
-                <Link href={`/student/courses/${course.id}/sections`}>Chọn lớp học phần</Link>
-              </Button>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-};
-
 export const CoursesCatalog = ({
   courses,
   studentFaculty,
@@ -74,37 +26,98 @@ export const CoursesCatalog = ({
   courses: CourseItem[];
   studentFaculty: string | null;
 }) => {
-  const inPlanCourses = courses.filter((course) => course.planType === "IN_PLAN");
-  const outPlanCourses = courses.filter((course) => course.planType === "OUT_PLAN");
+  const [filter, setFilter] = useState<"IN_PLAN" | "OUT_PLAN">(() =>
+    courses.some((course) => course.planType === "IN_PLAN") ? "IN_PLAN" : "OUT_PLAN",
+  );
+
+  const filteredCourses = courses.filter((course) => course.planType === filter);
 
   return (
-    <Card className="glass-card">
-      <CardHeader>
-        <CardTitle>Danh sách học phần mở đăng ký</CardTitle>
-        <p className="text-muted-foreground text-sm">
-          {studentFaculty
-            ? `Ngành hiện tại: ${studentFaculty}. Chỉ hiển thị học phần đúng chương trình đào tạo ngành của bạn.`
-            : "Bạn chưa được gán ngành/chương trình đào tạo. Vui lòng liên hệ Phòng đào tạo."}
+    <div className="min-h-[500px] space-y-4 bg-white font-sans text-gray-800">
+      <div className="mb-4 space-y-1 border-b pb-3">
+        <h2 className="text-lg font-bold text-[#0f3b46]">Đăng ký học phần HKI, 2026</h2>
+        <p className="text-sm">
+          Chương trình đào tạo: 1. {studentFaculty || "Quản trị"} - Khóa 32 Đợt 1 (Hướng ứng dụng)
         </p>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="in-plan" className="space-y-4">
-          <TabsList className="bg-muted/60">
-            <TabsTrigger value="in-plan">Trong kế hoạch ({inPlanCourses.length})</TabsTrigger>
-            <TabsTrigger value="out-plan">Ngoài kế hoạch ({outPlanCourses.length})</TabsTrigger>
-            <TabsTrigger value="all">Tất cả ({courses.length})</TabsTrigger>
-          </TabsList>
-          <TabsContent value="in-plan">
-            <CourseTable courses={inPlanCourses} />
-          </TabsContent>
-          <TabsContent value="out-plan">
-            <CourseTable courses={outPlanCourses} />
-          </TabsContent>
-          <TabsContent value="all">
-            <CourseTable courses={courses} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+      </div>
+
+      <div className="mb-4 flex items-center gap-6 text-sm font-medium">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="radio"
+            name="planFilter"
+            className="h-4 w-4 cursor-pointer accent-[#0f3b46]"
+            checked={filter === "IN_PLAN"}
+            onChange={() => setFilter("IN_PLAN")}
+          />
+          Đúng kế hoạch
+        </label>
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="radio"
+            name="planFilter"
+            className="h-4 w-4 cursor-pointer accent-[#0f3b46]"
+            checked={filter === "OUT_PLAN"}
+            onChange={() => setFilter("OUT_PLAN")}
+          />
+          Ngoài kế hoạch
+        </label>
+      </div>
+
+      <div className="mb-2 text-center font-bold text-gray-700 uppercase">
+        -{filter === "IN_PLAN" ? "Đúng kế hoạch" : "Ngoài kế hoạch"}-
+      </div>
+      <p className="mb-2 text-sm italic text-gray-600">* Ghi chú: đăng ký môn trong năm học - học kỳ</p>
+
+      <div className="overflow-hidden rounded-sm border border-gray-300 bg-white">
+        <Table>
+          <TableHeader className="bg-gray-100/80">
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-10 w-[50px] border-r border-gray-200 text-center font-semibold text-black">
+                STT
+              </TableHead>
+              <TableHead className="h-10 border-r border-gray-200 font-semibold text-black">Mã học phần</TableHead>
+              <TableHead className="h-10 border-r border-gray-200 font-semibold text-black">Tên học phần</TableHead>
+              <TableHead className="h-10 border-r border-gray-200 text-center font-semibold text-black">STC</TableHead>
+              <TableHead className="h-10 border-r border-gray-200 text-center font-semibold text-black">
+                Số lượng LHP
+              </TableHead>
+              <TableHead className="h-10 border-r border-gray-200 text-center font-semibold text-black">Bắt buộc</TableHead>
+              <TableHead className="h-10 text-center font-semibold text-black" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredCourses.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
+                  Không có học phần nào trong danh sách này.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCourses.map((course, index) => (
+                <TableRow key={course.id} className="border-b border-gray-200 hover:bg-slate-50">
+                  <TableCell className="border-r border-gray-200 text-center">{index + 1}</TableCell>
+                  <TableCell className="border-r border-gray-200 font-medium">{course.code}</TableCell>
+                  <TableCell className="border-r border-gray-200">{course.name}</TableCell>
+                  <TableCell className="border-r border-gray-200 text-center">{course.credits.toFixed(1)}</TableCell>
+                  <TableCell className="border-r border-gray-200 text-center">{course._count.sections}</TableCell>
+                  <TableCell className="border-r border-gray-200 text-center">
+                    <input type="checkbox" checked readOnly className="h-3.5 w-3.5 cursor-default accent-gray-500" />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Link
+                      href={`/student/courses/${course.id}/sections`}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      [Đăng ký]
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 };

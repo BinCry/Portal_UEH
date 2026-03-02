@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Info, Loader2, MapPin, ShieldCheck, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Info, Loader2, MapPin, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -38,15 +40,11 @@ type SectionItem = {
   capacity: number | null;
   registeredCount: number | null;
   reservedCount: number | null;
-  studentStatus: "FULL" | "NEAR_FULL" | "AVAILABLE";
+  studentStatus: "FULL" | "NEAR_FULL" | "AVAILABLE" | "WAITING";
   availableSlots: number;
 };
 
-const statusLabel = (status: SectionItem["studentStatus"]) => {
-  if (status === "FULL") return "Đã đầy";
-  if (status === "NEAR_FULL") return "Gần đầy";
-  return "Còn chỗ";
-};
+const NONE_PRIORITY = "__NONE__";
 
 const dayOfWeekLabel = (day: string) => {
   const map: Record<string, string> = {
@@ -61,53 +59,102 @@ const dayOfWeekLabel = (day: string) => {
   return map[day] ?? day;
 };
 
+const parsePayload = async (response: Response) => {
+  try {
+    return (await response.json()) as {
+      success?: boolean;
+      data?: { position?: number };
+      error?: { message?: string };
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const SectionsTable = ({
   courseId,
+  courseName = "Đang cập nhật",
   waitingActive,
   sections,
   waitingSections,
 }: {
   courseId: string;
+  courseName?: string;
   waitingActive: boolean;
   sections: SectionItem[];
   waitingSections: SectionItem[];
 }) => {
-  const [loadingSectionId, setLoadingSectionId] = useState<string | null>(null);
+  const router = useRouter();
+  const [searchCode, setSearchCode] = useState("");
+  const [searchInstructor, setSearchInstructor] = useState("");
+  const [searchSchedule, setSearchSchedule] = useState("");
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [loadingAction, setLoadingAction] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
-  const [priority1, setPriority1] = useState<string>("");
-  const [priority2, setPriority2] = useState<string>("");
-  const [priority3, setPriority3] = useState<string>("");
+  const [priority1, setPriority1] = useState("");
+  const [priority2, setPriority2] = useState("");
+  const [priority3, setPriority3] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  const selectableWaitingSections = useMemo(
-    () => (waitingSections.filter((section) => section.studentStatus !== "FULL").length ? waitingSections : waitingSections.slice(0, 3)),
-    [waitingSections],
-  );
+  const selectableWaitingSections = useMemo(() => {
+    const nonFullSections = waitingSections.filter((section) => section.studentStatus !== "FULL");
+    return nonFullSections.length ? nonFullSections : waitingSections.slice(0, 3);
+  }, [waitingSections]);
   const canJoinWaiting = waitingActive && waitingSections.length > 0;
 
-  const enroll = async (sectionId: string) => {
-    setLoadingSectionId(sectionId);
-    const response = await fetch("/api/enroll", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sectionId }),
+  const filteredSections = useMemo(() => {
+    return sections.filter((section) => {
+      const matchCode = section.code.toLowerCase().includes(searchCode.toLowerCase());
+      const matchInstructor = section.instructor.name.toLowerCase().includes(searchInstructor.toLowerCase());
+      const scheduleText = `${dayOfWeekLabel(section.dayOfWeek)} ${section.timeSlot.label} ${section.timeSlot.startTime} ${
+        section.timeSlot.endTime
+      } ${section.room.code} ${section.room.address || ""}`;
+      const matchSchedule = scheduleText.toLowerCase().includes(searchSchedule.toLowerCase());
+      return matchCode && matchInstructor && matchSchedule;
     });
-    const payload = await response.json();
-    setLoadingSectionId(null);
+  }, [sections, searchCode, searchInstructor, searchSchedule]);
 
-    if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "Đăng ký thất bại");
+  const selectedSectionData = sections.find((section) => section.id === selectedSectionId);
+  const isSelectedAvailable =
+    selectedSectionData?.studentStatus === "AVAILABLE" || selectedSectionData?.studentStatus === "NEAR_FULL";
+
+  const handleEnroll = async () => {
+    if (!selectedSectionId) {
+      toast.error("Vui lòng chọn một lớp học phần để đăng ký");
       return;
     }
 
-    toast.success("Đăng ký học phần thành công");
-    window.location.reload();
+    setLoadingAction(true);
+    try {
+      const response = await fetch("/api/enroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sectionId: selectedSectionId }),
+      });
+      const payload = await parsePayload(response);
+
+      if (!response.ok || !payload?.success) {
+        toast.error(payload?.error?.message ?? "Đăng ký thất bại");
+        return;
+      }
+
+      toast.success("Đăng ký học phần thành công");
+      window.location.reload();
+    } catch {
+      toast.error("Không thể kết nối tới máy chủ");
+    } finally {
+      setLoadingAction(false);
+    }
   };
 
   const joinWaiting = async () => {
-    const priorities = [priority1, priority2, priority3].filter(Boolean).map((sectionId) => ({ sectionId }));
-    if (!priorities.length) {
+    const selectedPriorities = [priority1, priority2, priority3].filter(Boolean);
+    if (!selectedPriorities.length) {
       toast.error("Vui lòng chọn ít nhất 1 nguyện vọng");
+      return;
+    }
+    if (new Set(selectedPriorities).size !== selectedPriorities.length) {
+      toast.error("Các nguyện vọng không được trùng nhau");
       return;
     }
     if (!acceptedTerms) {
@@ -115,242 +162,263 @@ export const SectionsTable = ({
       return;
     }
 
-    const response = await fetch("/api/waiting/join", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        courseId,
-        acceptedTerms,
-        priorities,
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      toast.error(payload.error?.message ?? "Không thể tham gia phòng chờ");
-      return;
-    }
+    setLoadingAction(true);
+    try {
+      const response = await fetch("/api/waiting/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          acceptedTerms,
+          priorities: selectedPriorities.map((sectionId) => ({ sectionId })),
+        }),
+      });
+      const payload = await parsePayload(response);
 
-    toast.success(`Tham gia phòng chờ thành công. Vị trí FIFO #${payload.data.position}`);
-    setOpenDialog(false);
-    setPriority1("");
-    setPriority2("");
-    setPriority3("");
-    setAcceptedTerms(false);
+      if (!response.ok || !payload?.success) {
+        toast.error(payload?.error?.message ?? "Không thể tham gia phòng chờ");
+        return;
+      }
+
+      toast.success(`Tham gia phòng chờ thành công. Vị trí ưu tiên #${payload.data?.position ?? "?"}`);
+      setOpenDialog(false);
+      setPriority1("");
+      setPriority2("");
+      setPriority3("");
+      setAcceptedTerms(false);
+    } catch {
+      toast.error("Không thể kết nối tới máy chủ");
+    } finally {
+      setLoadingAction(false);
+    }
   };
 
   return (
-    <>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
-          Danh sách bên dưới chỉ là lớp học phần đăng ký trực tiếp. Lớp bổ sung sẽ được mở trong phòng chờ.
-        </p>
-        <Button className="primary-glow h-10 rounded-xl px-5" onClick={() => setOpenDialog(true)} disabled={!canJoinWaiting}>
-          Tham gia phòng chờ
+    <div className="space-y-6 bg-white">
+      <div className="border-b pb-4">
+        <h2 className="text-lg font-bold text-[#0f3b46]">Học phần: {courseName}</h2>
+      </div>
+
+      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-4">
+        <div className="space-y-2">
+          <Label htmlFor="searchCode" className="text-xs font-semibold">
+            Mã LHP
+          </Label>
+          <Input
+            id="searchCode"
+            placeholder="Tìm theo mã..."
+            value={searchCode}
+            onChange={(event) => setSearchCode(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="searchInstructor" className="text-xs font-semibold">
+            Giảng viên
+          </Label>
+          <Input
+            id="searchInstructor"
+            placeholder="Tên giảng viên..."
+            value={searchInstructor}
+            onChange={(event) => setSearchInstructor(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="searchSchedule" className="text-xs font-semibold">
+            Nội dung Lịch học
+          </Label>
+          <Input
+            id="searchSchedule"
+            placeholder="Thứ, ca học, phòng..."
+            value={searchSchedule}
+            onChange={(event) => setSearchSchedule(event.target.value)}
+          />
+        </div>
+        <Button className="flex items-center gap-2 bg-[#0f3b46] text-white hover:bg-[#0f3b46]/90">
+          <Search className="size-4" /> Tìm kiếm
         </Button>
       </div>
 
       {!waitingActive ? (
-        <div className="mb-4 rounded-2xl border border-amber-200/80 bg-amber-50/65 p-3 text-sm">
-          Phòng chờ chưa kích hoạt. Khi học phần đạt ngưỡng gần đầy/full, hệ thống sẽ mở phòng chờ và hiển thị lớp bổ sung
-          để bạn chọn 3 nguyện vọng.
+        <div className="flex gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <Info className="size-5 shrink-0 text-amber-600" />
+          <span>
+            Phòng chờ sẽ được mở khi tất cả các lớp đã full hoặc sĩ số đăng ký cao hơn số lượng đăng ký max. Bạn có
+            thể chọn lớp bổ sung khi trạng thái này kích hoạt.
+          </span>
         </div>
       ) : null}
 
-      {sections.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Hiện chưa có lớp học phần đăng ký trực tiếp cho học phần này.</p>
-      ) : (
+      <div className="rounded-sm border border-gray-300">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-gray-100/80">
             <TableRow>
-              <TableHead>Mã LHP</TableHead>
-              <TableHead>Lịch học</TableHead>
-              <TableHead>Giảng viên</TableHead>
-              <TableHead>Cơ sở học</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Hành động</TableHead>
+              <TableHead className="w-[60px] border-r text-center font-semibold text-black">Chọn</TableHead>
+              <TableHead className="border-r font-semibold text-black">Mã LHP</TableHead>
+              <TableHead className="border-r text-center font-semibold text-black">Sĩ số ĐK</TableHead>
+              <TableHead className="border-r text-center font-semibold text-black">SL còn lại</TableHead>
+              <TableHead className="border-r font-semibold text-black">GV</TableHead>
+              <TableHead className="font-semibold text-black">Lịch học</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sections.map((section) => {
-              const allowDirectEnroll = section.studentStatus === "AVAILABLE";
-
-              return (
-                <TableRow key={section.id}>
-                  <TableCell>{section.code}</TableCell>
-                  <TableCell>
-                    <p className="font-medium">
-                      {dayOfWeekLabel(section.dayOfWeek)} - {section.timeSlot.label}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {section.timeSlot.startTime} - {section.timeSlot.endTime}
-                    </p>
+            {filteredSections.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                  Không tìm thấy lớp học phần.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredSections.map((section) => (
+                <TableRow
+                  key={section.id}
+                  className={`border-b border-gray-200 ${selectedSectionId === section.id ? "bg-blue-50/50" : ""}`}
+                >
+                  <TableCell className="border-r text-center">
+                    <input
+                      type="radio"
+                      name="sectionSelection"
+                      className="size-4 cursor-pointer accent-[#0f3b46]"
+                      checked={selectedSectionId === section.id}
+                      onChange={() => setSelectedSectionId(section.id)}
+                    />
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 text-sm">
-                      <UserRound className="text-muted-foreground size-3.5" />
-                      <span>{section.instructor.name}</span>
-                    </div>
+                  <TableCell className="border-r font-medium">
+                    {section.studentStatus === "WAITING" ? (
+                      <div className="space-y-1">
+                        <span className="block text-amber-700">Waiting room 1</span>
+                        <Badge variant="secondary" className="bg-amber-100 text-[10px] text-amber-800">
+                          [Đang chờ]
+                        </Badge>
+                      </div>
+                    ) : (
+                      section.code
+                    )}
+                  </TableCell>
+                  <TableCell className="border-r text-center">
+                    {section.capacityHidden ? "-" : (section.registeredCount ?? 0)}
+                  </TableCell>
+                  <TableCell className="border-r text-center">{section.capacityHidden ? "-" : section.availableSlots}</TableCell>
+                  <TableCell className="border-r">
+                    <span className="text-sm">{section.instructor.name}</span>
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
                       <p className="text-sm font-medium">
-                        {section.room.campus ?? "Cơ sở UEH"} - {section.room.code}
+                        {dayOfWeekLabel(section.dayOfWeek)}, {section.timeSlot.startTime}-{section.timeSlot.endTime},{" "}
+                        {section.room.code}
                       </p>
-                      <p className="text-muted-foreground flex items-start gap-1 text-xs leading-relaxed">
+                      <p className="text-muted-foreground flex items-start gap-1 text-xs">
                         <MapPin className="mt-0.5 size-3 shrink-0" />
-                        <span>{section.room.address ?? "Địa chỉ đang cập nhật"}</span>
+                        <span>{section.room.campus ?? "Cơ sở UEH"}, {section.room.address ?? "Đang cập nhật"}</span>
                       </p>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={section.studentStatus === "FULL" ? "destructive" : "secondary"}>
-                      {statusLabel(section.studentStatus)}
-                    </Badge>
-                    {!section.capacityHidden && section.capacity ? (
-                      <span className="text-muted-foreground mt-1 block text-xs">
-                        Còn {section.availableSlots}/{section.capacity}
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {allowDirectEnroll ? (
-                      <Button
-                        className="primary-glow"
-                        onClick={() => void enroll(section.id)}
-                        disabled={loadingSectionId === section.id}
-                      >
-                        {loadingSectionId === section.id ? <Loader2 className="size-4 animate-spin" /> : "Đăng ký"}
-                      </Button>
-                    ) : (
-                      <Button variant="outline" onClick={() => setOpenDialog(true)} disabled={!canJoinWaiting}>
-                        Phòng chờ
-                      </Button>
-                    )}
-                  </TableCell>
                 </TableRow>
-              );
-            })}
+              ))
+            )}
           </TableBody>
         </Table>
-      )}
+      </div>
+
+      <div className="flex items-center justify-end gap-3 border-t pt-4">
+        <Button
+          className="min-w-[180px] bg-emerald-600 text-white hover:bg-emerald-700"
+          onClick={() => setOpenDialog(true)}
+          disabled={!canJoinWaiting}
+        >
+          Đăng ký mở lớp bổ sung
+        </Button>
+        <Button
+          className="min-w-[120px] bg-blue-600 text-white hover:bg-blue-700"
+          onClick={handleEnroll}
+          disabled={!selectedSectionId || !isSelectedAvailable || loadingAction}
+        >
+          {loadingAction && isSelectedAvailable ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          Đăng ký
+        </Button>
+        <Button variant="outline" onClick={() => router.push("/student/courses")}>
+          Quay về
+        </Button>
+      </div>
 
       <Dialog
         open={openDialog}
-        onOpenChange={(value) => {
-          setOpenDialog(value);
-          if (!value) {
+        onOpenChange={(isOpen) => {
+          setOpenDialog(isOpen);
+          if (!isOpen) {
+            setPriority1("");
+            setPriority2("");
+            setPriority3("");
             setAcceptedTerms(false);
           }
         }}
       >
-        <DialogContent className="glass-card sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Chọn 3 nguyện vọng lớp bổ sung (P1-P3)</DialogTitle>
+        <DialogContent className="overflow-hidden bg-white p-0 sm:max-w-[700px]">
+          <DialogHeader className="border-b bg-gray-50/50 p-6">
+            <DialogTitle className="text-xl text-[#0f3b46]">Phòng chờ đăng ký học phần</DialogTitle>
             <DialogDescription>
               Hệ thống sẽ xét theo FIFO và ưu tiên nguyện vọng từ lớp bổ sung do phòng đào tạo mở cho phòng chờ.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Nguyện vọng 1</Label>
-                <Select value={priority1} onValueChange={setPriority1} disabled={!canJoinWaiting}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn lớp bổ sung ưu tiên 1" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectableWaitingSections.map((section) => (
-                      <SelectItem key={section.id} value={section.id}>
-                        {section.code} - {dayOfWeekLabel(section.dayOfWeek)} {section.timeSlot.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Nguyện vọng 2</Label>
-                <Select value={priority2} onValueChange={setPriority2} disabled={!canJoinWaiting}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn lớp bổ sung ưu tiên 2" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectableWaitingSections.map((section) => (
-                      <SelectItem key={section.id} value={section.id}>
-                        {section.code} - {dayOfWeekLabel(section.dayOfWeek)} {section.timeSlot.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Nguyện vọng 3</Label>
-                <Select value={priority3} onValueChange={setPriority3} disabled={!canJoinWaiting}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn lớp bổ sung ưu tiên 3" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectableWaitingSections.map((section) => (
-                      <SelectItem key={section.id} value={section.id}>
-                        {section.code} - {dayOfWeekLabel(section.dayOfWeek)} {section.timeSlot.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {canJoinWaiting ? null : (
-                <p className="text-muted-foreground text-xs">
-                  Hiện chưa có lớp bổ sung để chọn. Vui lòng quay lại sau khi phòng chờ active.
-                </p>
-              )}
+              {[
+                { label: "Ưu tiên 1:", value: priority1, onChange: setPriority1 },
+                { label: "Ưu tiên 2:", value: priority2, onChange: setPriority2 },
+                { label: "Ưu tiên 3:", value: priority3, onChange: setPriority3 },
+              ].map((priority) => (
+                <div key={priority.label} className="space-y-2">
+                  <Label className="font-semibold text-gray-700">{priority.label}</Label>
+                  <Select
+                    value={priority.value || NONE_PRIORITY}
+                    onValueChange={(value) => priority.onChange(value === NONE_PRIORITY ? "" : value)}
+                    disabled={!canJoinWaiting}
+                  >
+                    <SelectTrigger className="bg-white">
+                      <SelectValue placeholder="Không chọn" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_PRIORITY}>Không chọn</SelectItem>
+                      {selectableWaitingSections.map((section) => (
+                        <SelectItem key={section.id} value={section.id}>
+                          {dayOfWeekLabel(section.dayOfWeek)} {section.timeSlot.startTime} - {section.timeSlot.endTime}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
             </div>
-
-            <div className="bg-primary/8 border-primary/20 rounded-2xl border p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <ShieldCheck className="text-primary size-4" />
-                <h4 className="text-sm font-semibold">Điều khoản tham gia phòng chờ</h4>
+            <div className="flex flex-col justify-center rounded-lg border bg-slate-50 p-5">
+              <div className="mb-3 flex items-center gap-2 text-[#0f3b46]">
+                <ShieldCheck className="size-5" />
+                <h4 className="font-bold">Cam kết</h4>
               </div>
-              <ul className="text-muted-foreground space-y-2 text-xs leading-relaxed">
-                <li className="flex gap-2">
-                  <Info className="mt-0.5 size-3 shrink-0" />
-                  <span>Bạn cam kết xác nhận/từ chối offer trong thời hạn 24 giờ kể từ lúc nhận thông báo.</span>
-                </li>
-                <li className="flex gap-2">
-                  <Info className="mt-0.5 size-3 shrink-0" />
-                  <span>Nếu quá hạn, offer sẽ tự động hết hiệu lực và chuyển cho sinh viên tiếp theo theo FIFO.</span>
-                </li>
-                <li className="flex gap-2">
-                  <Info className="mt-0.5 size-3 shrink-0" />
-                  <span>Thông tin đăng ký khi xác nhận thành công sẽ được ghi nhận vào học vụ và tài chính.</span>
-                </li>
-                <li className="flex gap-2">
-                  <Info className="mt-0.5 size-3 shrink-0" />
-                  <span>Bạn chịu trách nhiệm đảm bảo không đăng ký trùng lịch và tuân thủ quy định đào tạo hiện hành.</span>
-                </li>
-              </ul>
-
-              <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-xl border border-emerald-400/25 bg-white/55 p-3 text-xs leading-relaxed">
+              <label className="flex cursor-pointer items-start gap-3 text-sm leading-snug text-gray-700">
                 <input
                   type="checkbox"
-                  className="mt-0.5 size-4 rounded border-emerald-500 accent-emerald-600"
+                  className="mt-1 size-4 shrink-0 rounded accent-emerald-600"
                   checked={acceptedTerms}
                   onChange={(event) => setAcceptedTerms(event.target.checked)}
                 />
-                <span>
-                  Tôi đã đọc, hiểu và <strong>đồng ý điều khoản</strong> tham gia phòng chờ lớp học.
-                </span>
+                <span>Tôi cam kết sẽ đăng ký lớp học này nếu trường mở lớp đúng một thời khoá biểu đã chọn.</span>
               </label>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenDialog(false)}>
-              Hủy
+          <DialogFooter className="flex justify-end gap-2 border-t bg-gray-50 p-4">
+            <Button
+              className="min-w-[160px] bg-[#0f3b46] text-white hover:bg-[#0f3b46]/90"
+              onClick={joinWaiting}
+              disabled={!acceptedTerms || !canJoinWaiting || loadingAction}
+            >
+              {loadingAction ? <Loader2 className="mr-2 size-4 animate-spin" /> : null} Tham gia phòng chờ
             </Button>
-            <Button className="primary-glow" onClick={() => void joinWaiting()} disabled={!acceptedTerms || !canJoinWaiting}>
-              Xác nhận
+            <Button variant="outline" onClick={() => setOpenDialog(false)}>
+              Đóng
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };
