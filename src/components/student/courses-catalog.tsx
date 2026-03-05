@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -30,7 +30,17 @@ export const CoursesCatalog = ({
     courses.some((course) => course.planType === "IN_PLAN") ? "IN_PLAN" : "OUT_PLAN",
   );
 
-  const filteredCourses = courses.filter((course) => course.planType === filter);
+  const uniqueCourses = useMemo(() => {
+    const uniqueByCode = new Map<string, CourseItem>();
+    for (const course of courses) {
+      if (!uniqueByCode.has(course.code)) {
+        uniqueByCode.set(course.code, course);
+      }
+    }
+    return [...uniqueByCode.values()];
+  }, [courses]);
+
+  const filteredCourses = uniqueCourses.filter((course) => course.planType === filter);
 
   return (
     <div className="min-h-[500px] space-y-4 bg-white font-sans text-gray-800">
@@ -67,7 +77,6 @@ export const CoursesCatalog = ({
       <div className="mb-2 text-center font-bold text-gray-700 uppercase">
         -{filter === "IN_PLAN" ? "Đúng kế hoạch" : "Ngoài kế hoạch"}-
       </div>
-      <p className="mb-2 text-sm italic text-gray-600">* Ghi chú: đăng ký môn trong năm học - học kỳ</p>
 
       <div className="overflow-hidden rounded-sm border border-gray-300 bg-white">
         <Table>
@@ -82,14 +91,13 @@ export const CoursesCatalog = ({
               <TableHead className="h-10 border-r border-gray-200 text-center font-semibold text-black">
                 Số lượng LHP
               </TableHead>
-              <TableHead className="h-10 border-r border-gray-200 text-center font-semibold text-black">Bắt buộc</TableHead>
               <TableHead className="h-10 text-center font-semibold text-black" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredCourses.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-6 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
                   Không có học phần nào trong danh sách này.
                 </TableCell>
               </TableRow>
@@ -101,9 +109,6 @@ export const CoursesCatalog = ({
                   <TableCell className="border-r border-gray-200">{course.name}</TableCell>
                   <TableCell className="border-r border-gray-200 text-center">{course.credits.toFixed(1)}</TableCell>
                   <TableCell className="border-r border-gray-200 text-center">{course._count.sections}</TableCell>
-                  <TableCell className="border-r border-gray-200 text-center">
-                    <input type="checkbox" checked readOnly className="h-3.5 w-3.5 cursor-default accent-gray-500" />
-                  </TableCell>
                   <TableCell className="text-center">
                     <Link
                       href={`/student/courses/${course.id}/sections`}

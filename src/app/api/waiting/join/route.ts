@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       return fail(
         {
           code: "JOIN_WAITING_FAILED",
-          message: error instanceof Error ? error.message : "Không th? tham gia phòng ch?",
+          message: error instanceof Error ? error.message : "Không thể tham gia phòng chờ",
         },
         400,
       );

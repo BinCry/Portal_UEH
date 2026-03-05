@@ -1,4 +1,4 @@
-import { EnrollmentStatus, FinanceStatus, NotificationType, WaitingEntryState } from "@prisma/client";
+import { EnrollmentStatus, FinanceStatus, NotificationType, Prisma, WaitingEntryState } from "@prisma/client";
 import {
   TUITION_PER_CREDIT,
   WAITING_BLOCK_NEXT_SEMESTER_DAYS,
@@ -22,7 +22,7 @@ export const enrollmentService = {
         select: { faculty: true },
       });
       if (!studentProfile?.faculty) {
-        throw new Error("Ban chua duoc gan nganh/chuong trinh dao tao");
+        throw new Error("Bạn chưa được gán ngành/chương trình đào tạo");
       }
 
       const section = await tx.section.findUnique({
@@ -33,16 +33,32 @@ export const enrollmentService = {
         },
       });
       if (!section || section.status !== "OPEN") {
-        throw new Error("LHP khong kha dung");
+        throw new Error("Lớp học phần không khả dụng");
       }
       if (section.isWaitingOption) {
-        throw new Error("Lop nay chi dung cho phong cho");
+        throw new Error("Lớp này chỉ dùng cho phòng chờ");
       }
       if (section.course.faculty !== studentProfile.faculty) {
-        throw new Error("Ban chi duoc dang ky hoc phan thuoc nganh cua minh");
+        throw new Error("Bạn chỉ được đăng ký học phần thuộc ngành của mình");
       }
       if (availableSlots(section.capacity, section.registeredCount, section.reservedCount) <= 0) {
-        throw new Error("LHP da full");
+        throw new Error("Lớp học phần đã đầy");
+      }
+
+      const existingBySection = await tx.enrollment.findUnique({
+        where: {
+          studentId_sectionId: {
+            studentId,
+            sectionId,
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+      });
+      if (existingBySection?.status === EnrollmentStatus.ENROLLED) {
+        throw new Error("Bạn đã đăng ký lớp học phần này");
       }
 
       const existing = await tx.enrollment.findMany({
@@ -59,16 +75,67 @@ export const enrollmentService = {
         },
       });
       if (hasScheduleConflict(section, existing.map((x) => x.section))) {
-        throw new Error("Trung lich hoc");
+        throw new Error("Trùng lịch học");
       }
 
-      const enrollment = await tx.enrollment.create({
-        data: {
-          studentId,
-          sectionId,
-          status: EnrollmentStatus.ENROLLED,
-        },
-      });
+      let enrollment;
+      if (existingBySection?.status === EnrollmentStatus.CANCELLED) {
+        const revived = await tx.enrollment.updateMany({
+          where: {
+            studentId,
+            sectionId,
+            status: EnrollmentStatus.CANCELLED,
+          },
+          data: {
+            status: EnrollmentStatus.ENROLLED,
+          },
+        });
+
+        if (!revived.count) {
+          const latest = await tx.enrollment.findUnique({
+            where: {
+              studentId_sectionId: {
+                studentId,
+                sectionId,
+              },
+            },
+            select: { status: true },
+          });
+          if (latest?.status === EnrollmentStatus.ENROLLED) {
+            throw new Error("Bạn đã đăng ký lớp học phần này");
+          }
+          throw new Error("Học phần đang được xử lý, vui lòng thử lại");
+        }
+
+        enrollment = await tx.enrollment.findUnique({
+          where: {
+            studentId_sectionId: {
+              studentId,
+              sectionId,
+            },
+          },
+        });
+      } else {
+        try {
+          enrollment = await tx.enrollment.create({
+            data: {
+              studentId,
+              sectionId,
+              status: EnrollmentStatus.ENROLLED,
+            },
+          });
+        } catch (error) {
+          if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            throw new Error("Bạn đã đăng ký lớp học phần này");
+          }
+          throw error;
+        }
+      }
+
+      if (!enrollment) {
+        throw new Error("Không thể tạo đăng ký học phần");
+      }
+
       await tx.section.update({
         where: { id: sectionId },
         data: { registeredCount: { increment: 1 } },
@@ -100,6 +167,147 @@ export const enrollmentService = {
     });
   },
 
+  async cancelEnrollment(studentId: string, enrollmentId: string) {
+    const result = await prisma.$transaction(async (tx) => {
+      const enrollment = await tx.enrollment.findFirst({
+        where: {
+          id: enrollmentId,
+          studentId,
+        },
+        include: {
+          section: {
+            include: {
+              course: {
+                select: {
+                  code: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!enrollment) {
+        throw new Error("Không tìm thấy học phần đã đăng ký");
+      }
+      if (enrollment.status !== EnrollmentStatus.ENROLLED) {
+        throw new Error("Học phần này đã được hủy trước đó");
+      }
+
+      const confirmedWaitingEntry = await tx.waitingEntry.findFirst({
+        where: {
+          studentId,
+          offerSectionId: enrollment.sectionId,
+          state: WaitingEntryState.CONFIRMED,
+        },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          waitingRoomId: true,
+        },
+      });
+      const source = confirmedWaitingEntry ? ("WAITING_ROOM" as const) : ("DIRECT" as const);
+
+      const updatedEnrollment = await tx.enrollment.updateMany({
+        where: {
+          id: enrollmentId,
+          studentId,
+          status: EnrollmentStatus.ENROLLED,
+        },
+        data: {
+          status: EnrollmentStatus.CANCELLED,
+        },
+      });
+      if (!updatedEnrollment.count) {
+        throw new Error("Học phần này đã được xử lý trước đó");
+      }
+
+      const updatedSection = await tx.section.updateMany({
+        where: {
+          id: enrollment.sectionId,
+          registeredCount: {
+            gt: 0,
+          },
+        },
+        data: {
+          registeredCount: {
+            decrement: 1,
+          },
+        },
+      });
+      if (!updatedSection.count) {
+        throw new Error("Không thể cập nhật sĩ số lớp học phần");
+      }
+
+      await tx.financeLedger.updateMany({
+        where: {
+          studentId,
+          sectionId: enrollment.sectionId,
+          status: {
+            in: [FinanceStatus.PENDING, FinanceStatus.POSTED],
+          },
+        },
+        data: {
+          status: FinanceStatus.VOID,
+        },
+      });
+
+      return {
+        enrollmentId: enrollment.id,
+        sectionId: enrollment.sectionId,
+        source,
+        warningNextSemester: source === "WAITING_ROOM",
+        waitingEntryId: confirmedWaitingEntry?.id ?? null,
+        waitingRoomId: confirmedWaitingEntry?.waitingRoomId ?? null,
+        sectionCode: enrollment.section.code,
+        courseCode: enrollment.section.course.code,
+        courseName: enrollment.section.course.name,
+      };
+    });
+
+    await Promise.all([
+      notificationService.create(studentId, NotificationType.SYSTEM, {
+        title: "Đã hủy học phần",
+        message:
+          result.source === "WAITING_ROOM"
+            ? `Bạn đã hủy học phần ${result.courseCode}. Vui lòng cân nhắc trách nhiệm với lựa chọn phòng chờ ở kỳ sau.`
+            : `Bạn đã hủy học phần ${result.courseCode} thành công.`,
+        enrollmentId: result.enrollmentId,
+        sectionId: result.sectionId,
+        sectionCode: result.sectionCode,
+        waitingEntryId: result.waitingEntryId,
+        waitingRoomId: result.waitingRoomId,
+        source: result.source,
+        warningNextSemester: result.warningNextSemester,
+      }),
+      notificationService.createForAdmins(NotificationType.SYSTEM, {
+        title: "Sinh viên đã hủy học phần",
+        message:
+          result.source === "WAITING_ROOM"
+            ? `Sinh viên đã hủy học phần ${result.courseCode} (nguồn phòng chờ).`
+            : `Sinh viên đã hủy học phần ${result.courseCode} (đăng ký trực tiếp).`,
+        studentId,
+        enrollmentId: result.enrollmentId,
+        sectionId: result.sectionId,
+        sectionCode: result.sectionCode,
+        courseCode: result.courseCode,
+        courseName: result.courseName,
+        waitingEntryId: result.waitingEntryId,
+        waitingRoomId: result.waitingRoomId,
+        source: result.source,
+        warningNextSemester: result.warningNextSemester,
+      }),
+    ]);
+
+    return {
+      enrollmentId: result.enrollmentId,
+      sectionId: result.sectionId,
+      source: result.source,
+      warningNextSemester: result.warningNextSemester,
+    };
+  },
+
   async confirmWaitingOffer(studentId: string, waitingEntryId: string) {
     const result = await prisma.$transaction(async (tx) => {
       const entry = await tx.waitingEntry.findUnique({
@@ -120,16 +328,16 @@ export const enrollmentService = {
         },
       });
       if (!entry || entry.studentId !== studentId) {
-        throw new Error("Khong tim thay yeu cau");
+        throw new Error("Không tìm thấy yêu cầu");
       }
       if (entry.state !== WaitingEntryState.OFFERED) {
-        throw new Error("Trang thai khong hop le");
+        throw new Error("Trạng thái không hợp lệ");
       }
       if (isExpired(entry.expiresAt)) {
-        throw new Error("Offer da het han");
+        throw new Error("Offer đã hết hạn");
       }
       if (!entry.offerSectionId) {
-        throw new Error("Offer section khong hop le");
+        throw new Error("Lớp đề xuất không hợp lệ");
       }
 
       await tx.waitingEntry.update({
@@ -205,10 +413,10 @@ export const enrollmentService = {
       },
     });
     if (!entry || entry.studentId !== studentId) {
-      throw new Error("Khong tim thay yeu cau");
+      throw new Error("Không tìm thấy yêu cầu");
     }
     if (entry.state !== WaitingEntryState.OFFERED) {
-      throw new Error("Chi co the tu choi OFFERED");
+      throw new Error("Chỉ có thể từ chối offer đang chờ xác nhận");
     }
 
     const matchedPriority = entry.matchedPriority ?? 3;
@@ -312,7 +520,7 @@ export const enrollmentService = {
           where: { id: entry.id },
           data: {
             state: WaitingEntryState.EXPIRED,
-            reason: "Qua han xac nhan 24h",
+            reason: "Quá hạn xác nhận 24h",
           },
         });
 

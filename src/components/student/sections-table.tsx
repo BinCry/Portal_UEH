@@ -33,9 +33,6 @@ type SectionItem = {
     campus?: string | null;
     address?: string | null;
   };
-  instructor: {
-    name: string;
-  };
   capacityHidden: boolean;
   capacity: number | null;
   registeredCount: number | null;
@@ -86,7 +83,6 @@ export const SectionsTable = ({
 }) => {
   const router = useRouter();
   const [searchCode, setSearchCode] = useState("");
-  const [searchInstructor, setSearchInstructor] = useState("");
   const [searchSchedule, setSearchSchedule] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
@@ -98,21 +94,20 @@ export const SectionsTable = ({
 
   const selectableWaitingSections = useMemo(() => {
     const nonFullSections = waitingSections.filter((section) => section.studentStatus !== "FULL");
-    return nonFullSections.length ? nonFullSections : waitingSections.slice(0, 3);
+    return nonFullSections.length ? nonFullSections : waitingSections;
   }, [waitingSections]);
   const canJoinWaiting = waitingActive && waitingSections.length > 0;
 
   const filteredSections = useMemo(() => {
     return sections.filter((section) => {
       const matchCode = section.code.toLowerCase().includes(searchCode.toLowerCase());
-      const matchInstructor = section.instructor.name.toLowerCase().includes(searchInstructor.toLowerCase());
       const scheduleText = `${dayOfWeekLabel(section.dayOfWeek)} ${section.timeSlot.label} ${section.timeSlot.startTime} ${
         section.timeSlot.endTime
       } ${section.room.code} ${section.room.address || ""}`;
       const matchSchedule = scheduleText.toLowerCase().includes(searchSchedule.toLowerCase());
-      return matchCode && matchInstructor && matchSchedule;
+      return matchCode && matchSchedule;
     });
-  }, [sections, searchCode, searchInstructor, searchSchedule]);
+  }, [sections, searchCode, searchSchedule]);
 
   const selectedSectionData = sections.find((section) => section.id === selectedSectionId);
   const isSelectedAvailable =
@@ -199,7 +194,7 @@ export const SectionsTable = ({
         <h2 className="text-lg font-bold text-[#0f3b46]">Học phần: {courseName}</h2>
       </div>
 
-      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="searchCode" className="text-xs font-semibold">
             Mã LHP
@@ -209,17 +204,6 @@ export const SectionsTable = ({
             placeholder="Tìm theo mã..."
             value={searchCode}
             onChange={(event) => setSearchCode(event.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="searchInstructor" className="text-xs font-semibold">
-            Giảng viên
-          </Label>
-          <Input
-            id="searchInstructor"
-            placeholder="Tên giảng viên..."
-            value={searchInstructor}
-            onChange={(event) => setSearchInstructor(event.target.value)}
           />
         </div>
         <div className="space-y-2">
@@ -242,8 +226,7 @@ export const SectionsTable = ({
         <div className="flex gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <Info className="size-5 shrink-0 text-amber-600" />
           <span>
-            Phòng chờ sẽ được mở khi tất cả các lớp đã full hoặc sĩ số đăng ký cao hơn số lượng đăng ký max. Bạn có
-            thể chọn lớp bổ sung khi trạng thái này kích hoạt.
+            Phòng chờ sẽ được mở khi có lớp học phần đã đầy. Bạn có thể chọn lớp bổ sung khi trạng thái này kích hoạt.
           </span>
         </div>
       ) : null}
@@ -256,14 +239,13 @@ export const SectionsTable = ({
               <TableHead className="border-r font-semibold text-black">Mã LHP</TableHead>
               <TableHead className="border-r text-center font-semibold text-black">Sĩ số ĐK</TableHead>
               <TableHead className="border-r text-center font-semibold text-black">SL còn lại</TableHead>
-              <TableHead className="border-r font-semibold text-black">GV</TableHead>
               <TableHead className="font-semibold text-black">Lịch học</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSections.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-6 text-center text-muted-foreground">
                   Không tìm thấy lớp học phần.
                 </TableCell>
               </TableRow>
@@ -298,9 +280,6 @@ export const SectionsTable = ({
                     {section.capacityHidden ? "-" : (section.registeredCount ?? 0)}
                   </TableCell>
                   <TableCell className="border-r text-center">{section.capacityHidden ? "-" : section.availableSlots}</TableCell>
-                  <TableCell className="border-r">
-                    <span className="text-sm">{section.instructor.name}</span>
-                  </TableCell>
                   <TableCell>
                     <div className="space-y-1">
                       <p className="text-sm font-medium">
@@ -401,7 +380,7 @@ export const SectionsTable = ({
                   checked={acceptedTerms}
                   onChange={(event) => setAcceptedTerms(event.target.checked)}
                 />
-                <span>Tôi cam kết sẽ đăng ký lớp học này nếu trường mở lớp đúng một thời khoá biểu đã chọn.</span>
+                <span>Tôi cam kết có trách nhiệm với lựa chọn tham gia lớp phòng chờ này.</span>
               </label>
             </div>
           </div>

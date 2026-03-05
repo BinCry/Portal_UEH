@@ -2,8 +2,9 @@
 
 import { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { GraduationCap, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { NotificationBell } from "@/components/shared/notification-bell";
 import { SignOutButton } from "@/components/shared/sign-out-button";
 import { Button } from "@/components/ui/button";
@@ -34,8 +35,8 @@ export const PortalShell = ({ children, userRole, nav = [] }: PortalShellProps) 
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white shadow-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
-            <div className="hidden size-10 items-center justify-center rounded-full bg-[#0f3b46] text-white md:flex">
-              <GraduationCap className="size-6" />
+            <div className="flex size-10 items-center justify-center overflow-hidden rounded-full border border-gray-200 bg-white">
+              <Image src="/ueh.png" alt="UEH logo" width={32} height={32} className="size-8 object-contain" priority />
             </div>
             <div className="flex flex-col">
               <Link
@@ -44,7 +45,6 @@ export const PortalShell = ({ children, userRole, nav = [] }: PortalShellProps) 
               >
                 Cổng Đăng Ký Tín Chỉ Thông Minh
               </Link>
-              <span className="text-xs font-medium text-emerald-600">Tích Hợp &quot;Phòng Chờ&quot; Lớp Học</span>
             </div>
           </div>
 

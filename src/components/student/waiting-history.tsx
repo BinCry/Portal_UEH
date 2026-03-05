@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -24,9 +24,6 @@ type WaitingItem = {
   offerSection: {
     code: string;
     dayOfWeek: string;
-    instructor: {
-      name: string;
-    };
     room: {
       campus: string | null;
       code: string;
@@ -45,6 +42,7 @@ type EnrollmentItem = {
   source: "WAITING_ROOM" | "DIRECT";
   createdAt: string;
   section: {
+    id?: string;
     code: string;
     dayOfWeek: string;
     course: {
@@ -58,6 +56,19 @@ type EnrollmentItem = {
     timeSlot: {
       label: string;
     };
+  };
+};
+
+type CancelEnrollmentPayload = {
+  success?: boolean;
+  data?: {
+    enrollmentId: string;
+    sectionId: string;
+    source: "WAITING_ROOM" | "DIRECT";
+    warningNextSemester: boolean;
+  };
+  error?: {
+    message?: string;
   };
 };
 
@@ -80,19 +91,24 @@ export const WaitingHistory = () => {
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [cancelLoadingId, setCancelLoadingId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<EnrollmentItem | null>(null);
   const [detail, setDetail] = useState<{ title: string; rows: Array<{ label: string; value: string }> } | null>(null);
 
   const load = async () => {
     setLoading(true);
-    const [waitingRes, enrollmentsRes] = await Promise.all([fetch("/api/waiting/me"), fetch("/api/enrollments/me")]);
-    const [waitingPayload, enrollmentsPayload] = await Promise.all([waitingRes.json(), enrollmentsRes.json()]);
-    setLoading(false);
+    try {
+      const [waitingRes, enrollmentsRes] = await Promise.all([fetch("/api/waiting/me"), fetch("/api/enrollments/me")]);
+      const [waitingPayload, enrollmentsPayload] = await Promise.all([waitingRes.json(), enrollmentsRes.json()]);
 
-    if (waitingPayload.success) {
-      setWaitingItems(waitingPayload.data);
-    }
-    if (enrollmentsPayload.success) {
-      setEnrollments(enrollmentsPayload.data);
+      if (waitingPayload.success) {
+        setWaitingItems(waitingPayload.data);
+      }
+      if (enrollmentsPayload.success) {
+        setEnrollments(enrollmentsPayload.data);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -162,6 +178,38 @@ export const WaitingHistory = () => {
     await load();
   };
 
+  const cancelEnrollment = async () => {
+    if (!cancelTarget) return;
+    setCancelLoadingId(cancelTarget.id);
+
+    try {
+      const response = await fetch("/api/enrollments/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enrollmentId: cancelTarget.id }),
+      });
+      const payload = (await response.json()) as CancelEnrollmentPayload;
+
+      if (!response.ok || !payload.success || !payload.data) {
+        toast.error(payload.error?.message ?? "Không thể hủy học phần");
+        return;
+      }
+
+      if (payload.data.warningNextSemester) {
+        toast.success("Đã hủy học phần. Lưu ý trách nhiệm với lựa chọn phòng chờ ở kỳ sau.");
+      } else {
+        toast.success("Đã hủy học phần thành công.");
+      }
+
+      setCancelTarget(null);
+      await load();
+    } catch {
+      toast.error("Không thể kết nối tới máy chủ");
+    } finally {
+      setCancelLoadingId(null);
+    }
+  };
+
   const openEnrollmentDetail = (item: EnrollmentItem) => {
     setDetail({
       title: `${item.section.course.code} - ${item.section.course.name}`,
@@ -195,7 +243,6 @@ export const WaitingHistory = () => {
           label: "Lịch học",
           value: `${item.offerSection.dayOfWeek} - ${item.offerSection.timeSlot.label} (${item.offerSection.timeSlot.startTime}-${item.offerSection.timeSlot.endTime})`,
         },
-        { label: "Giảng viên", value: item.offerSection.instructor.name },
         { label: "Phòng học", value: `${item.offerSection.room.campus ?? "UEH"} - ${item.offerSection.room.code}` },
         { label: "Địa chỉ", value: item.offerSection.room.address ?? "Đang cập nhật" },
         { label: "Trạng thái", value: waitingStateLabel[item.state] },
@@ -224,6 +271,7 @@ export const WaitingHistory = () => {
                 <TableHead>Thời khóa biểu</TableHead>
                 <TableHead>Cơ sở</TableHead>
                 <TableHead>Nguồn đăng ký</TableHead>
+                <TableHead className="text-right">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -244,6 +292,16 @@ export const WaitingHistory = () => {
                   </TableCell>
                   <TableCell>
                     <Badge variant={item.source === "WAITING_ROOM" ? "default" : "secondary"}>{sourceLabel(item.source)}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                      onClick={() => setCancelTarget(item)}
+                      disabled={cancelLoadingId === item.id}
+                    >
+                      Hủy học phần
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -329,6 +387,47 @@ export const WaitingHistory = () => {
                   <span>{row.value}</span>
                 </div>
               ))}
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => {
+          if (!open && !cancelLoadingId) {
+            setCancelTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Xác nhận hủy học phần</DialogTitle>
+          </DialogHeader>
+          {cancelTarget ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                Bạn sắp hủy học phần <strong>{cancelTarget.section.course.code}</strong> - {cancelTarget.section.course.name} (
+                {cancelTarget.section.code}).
+              </p>
+              {cancelTarget.source === "WAITING_ROOM" ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
+                  Phòng chờ kỳ sau: Bạn đang hủy học phần đã xác nhận qua phòng chờ. Vui lòng cân nhắc trách nhiệm với lựa
+                  chọn phòng chờ ở kỳ sau.
+                </div>
+              ) : null}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelLoadingId === cancelTarget.id}>
+                  Giữ lại
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => void cancelEnrollment()}
+                  disabled={cancelLoadingId === cancelTarget.id}
+                >
+                  Xác nhận hủy
+                </Button>
+              </div>
             </div>
           ) : null}
         </DialogContent>

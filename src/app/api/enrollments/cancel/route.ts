@@ -1,30 +1,29 @@
-﻿import { fail, ok } from "@/lib/api";
+import { fail, ok } from "@/lib/api";
 import { withApiTiming } from "@/lib/api-timing";
 import { parseBody } from "@/lib/http";
 import { requireApiRole } from "@/lib/route-guards";
-import { waitingDecisionSchema } from "@/lib/zod-schemas/waiting";
+import { cancelEnrollmentSchema } from "@/lib/zod-schemas/student";
 import { enrollmentService } from "@/domain/services/enrollment.service";
 
 export async function POST(request: Request) {
-  return withApiTiming("POST /api/waiting/confirm", async () => {
+  return withApiTiming("POST /api/enrollments/cancel", async () => {
     const auth = await requireApiRole("STUDENT");
     if (!auth.ok) {
       return fail({ code: "UNAUTHORIZED", message: auth.message }, auth.status);
     }
 
     try {
-      const body = await parseBody(request, waitingDecisionSchema);
-      const result = await enrollmentService.confirmWaitingOffer(auth.user.id, body.waitingEntryId);
+      const body = await parseBody(request, cancelEnrollmentSchema);
+      const result = await enrollmentService.cancelEnrollment(auth.user.id, body.enrollmentId);
       return ok(result);
     } catch (error) {
       return fail(
         {
-          code: "CONFIRM_FAILED",
-          message: error instanceof Error ? error.message : "Không thể xác nhận offer",
+          code: "CANCEL_ENROLLMENT_FAILED",
+          message: error instanceof Error ? error.message : "Không thể hủy học phần",
         },
-        400,
+        409,
       );
     }
   });
 }
-
