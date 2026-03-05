@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TIMEZONE } from "@/lib/constants";
 
 type Course = { id: string; code: string; name: string; planType: "IN_PLAN" | "OUT_PLAN" };
 type TimeSlot = { id: string; label: string };
@@ -89,7 +90,93 @@ const dayLabelMap: Record<DayOfWeek, string> = {
   SUNDAY: "Chủ Nhật",
 };
 
-const toDateInputValue = (value?: string | null) => (value ? value.slice(0, 10) : "");
+const parseDateInput = (value: string) => {
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const dmySlash = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  const dmyDash = /^(\d{2})-(\d{2})-(\d{4})$/.exec(raw);
+  const dmySlashShort = /^(\d{2})\/(\d{2})\/(\d{2})$/.exec(raw);
+  const dmyDashShort = /^(\d{2})-(\d{2})-(\d{2})$/.exec(raw);
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else if (dmySlash) {
+    day = Number(dmySlash[1]);
+    month = Number(dmySlash[2]);
+    year = Number(dmySlash[3]);
+  } else if (dmyDash) {
+    day = Number(dmyDash[1]);
+    month = Number(dmyDash[2]);
+    year = Number(dmyDash[3]);
+  } else if (dmySlashShort) {
+    day = Number(dmySlashShort[1]);
+    month = Number(dmySlashShort[2]);
+    year = 2000 + Number(dmySlashShort[3]);
+  } else if (dmyDashShort) {
+    day = Number(dmyDashShort[1]);
+    month = Number(dmyDashShort[2]);
+    year = 2000 + Number(dmyDashShort[3]);
+  } else {
+    return null;
+  }
+
+  if (year < 1900 || year > 2100) return null;
+
+  const validated = new Date(Date.UTC(year, month - 1, day));
+  const ok =
+    validated.getUTCFullYear() === year &&
+    validated.getUTCMonth() === month - 1 &&
+    validated.getUTCDate() === day;
+  if (!ok) return null;
+
+  return { year, month, day };
+};
+
+const toDateInputValue = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  if (!year || !month || !day) return "";
+
+  return `${day}/${month}/${year}`;
+};
+
+const normalizeDateInput = (value: string) => {
+  const parsed = parseDateInput(value);
+  if (!parsed) return null;
+  return `${String(parsed.day).padStart(2, "0")}/${String(parsed.month).padStart(2, "0")}/${parsed.year}`;
+};
+
+const toApiDateValue = (value: string) => {
+  const parsed = parseDateInput(value);
+  if (!parsed) return undefined;
+  return `${parsed.year}-${String(parsed.month).padStart(2, "0")}-${String(parsed.day).padStart(2, "0")}`;
+};
+
+const getDateTimestamp = (value: string) => {
+  const parsed = parseDateInput(value);
+  if (!parsed) return null;
+  return Date.UTC(parsed.year, parsed.month - 1, parsed.day);
+};
 
 const initialForm: SectionForm = {
   code: "",
@@ -123,8 +210,8 @@ const toPayload = (form: SectionForm) => ({
   },
   dayOfWeek: form.dayOfWeek,
   timeSlotId: form.timeSlotId,
-  startDate: form.startDate || undefined,
-  endDate: form.endDate || undefined,
+  startDate: toApiDateValue(form.startDate),
+  endDate: toApiDateValue(form.endDate),
   capacity: form.capacity,
   capacityHidden: form.capacityHidden,
   isWaitingOption: form.isWaitingOption,
@@ -159,6 +246,25 @@ export const SectionsManager = () => {
   const [editingForm, setEditingForm] = useState<SectionForm | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const normalizeCreateDateField = (field: "startDate" | "endDate", value: string) => {
+    const normalized = normalizeDateInput(value);
+    if (value.trim() && !normalized) {
+      toast.error("Ngày không hợp lệ. Vui lòng nhập dd/mm/yyyy hoặc yyyy-mm-dd");
+      return;
+    }
+    setForm((current) => ({ ...current, [field]: normalized ?? "" }));
+  };
+
+  const normalizeEditDateField = (field: "startDate" | "endDate", value: string) => {
+    if (!editingForm) return;
+    const normalized = normalizeDateInput(value);
+    if (value.trim() && !normalized) {
+      toast.error("Ngày không hợp lệ. Vui lòng nhập dd/mm/yyyy hoặc yyyy-mm-dd");
+      return;
+    }
+    setEditingForm({ ...editingForm, [field]: normalized ?? "" });
+  };
+
   const load = async () => {
     const [sectionsRes, coursesRes, timeSlotsRes] = await Promise.all([
       fetch("/api/admin/sections"),
@@ -182,11 +288,37 @@ export const SectionsManager = () => {
   const createSection = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const normalizedStartDate = form.startDate ? (normalizeDateInput(form.startDate) ?? "") : "";
+    const normalizedEndDate = form.endDate ? (normalizeDateInput(form.endDate) ?? "") : "";
+    if (form.startDate && !normalizedStartDate) {
+      toast.error("Ngày bắt đầu không hợp lệ. Vui lòng nhập dd/mm/yyyy");
+      return;
+    }
+    if (form.endDate && !normalizedEndDate) {
+      toast.error("Ngày kết thúc không hợp lệ. Vui lòng nhập dd/mm/yyyy");
+      return;
+    }
+    if (normalizedStartDate && normalizedEndDate) {
+      const startTs = getDateTimestamp(normalizedStartDate);
+      const endTs = getDateTimestamp(normalizedEndDate);
+      if (startTs !== null && endTs !== null && startTs > endTs) {
+        toast.error("Ngày bắt đầu không được lớn hơn ngày kết thúc");
+        return;
+      }
+    }
+
+    const normalizedForm = {
+      ...form,
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate,
+    };
+    setForm(normalizedForm);
+
     const response = await fetch("/api/admin/sections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...toPayload(form),
+        ...toPayload(normalizedForm),
         registeredCount: 0,
       }),
     });
@@ -209,11 +341,37 @@ export const SectionsManager = () => {
     event.preventDefault();
     if (!editingId || !editingForm) return;
 
+    const normalizedStartDate = editingForm.startDate ? (normalizeDateInput(editingForm.startDate) ?? "") : "";
+    const normalizedEndDate = editingForm.endDate ? (normalizeDateInput(editingForm.endDate) ?? "") : "";
+    if (editingForm.startDate && !normalizedStartDate) {
+      toast.error("Ngày bắt đầu không hợp lệ. Vui lòng nhập dd/mm/yyyy");
+      return;
+    }
+    if (editingForm.endDate && !normalizedEndDate) {
+      toast.error("Ngày kết thúc không hợp lệ. Vui lòng nhập dd/mm/yyyy");
+      return;
+    }
+    if (normalizedStartDate && normalizedEndDate) {
+      const startTs = getDateTimestamp(normalizedStartDate);
+      const endTs = getDateTimestamp(normalizedEndDate);
+      if (startTs !== null && endTs !== null && startTs > endTs) {
+        toast.error("Ngày bắt đầu không được lớn hơn ngày kết thúc");
+        return;
+      }
+    }
+
+    const normalizedEditingForm = {
+      ...editingForm,
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate,
+    };
+    setEditingForm(normalizedEditingForm);
+
     setSavingEdit(true);
     const response = await fetch(`/api/admin/sections/${editingId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(toPayload(editingForm)),
+      body: JSON.stringify(toPayload(normalizedEditingForm)),
     });
     const payload = await response.json();
     setSavingEdit(false);
@@ -386,14 +544,24 @@ export const SectionsManager = () => {
               <div className="space-y-2">
                 <Label>Ngày bắt đầu</Label>
                 <Input
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="dd/mm/yyyy"
                   value={form.startDate}
                   onChange={(event) => setForm({ ...form, startDate: event.target.value })}
+                  onBlur={(event) => normalizeCreateDateField("startDate", event.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Ngày kết thúc</Label>
-                <Input type="date" value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} />
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="dd/mm/yyyy"
+                  value={form.endDate}
+                  onChange={(event) => setForm({ ...form, endDate: event.target.value })}
+                  onBlur={(event) => normalizeCreateDateField("endDate", event.target.value)}
+                />
               </div>
             </div>
 
@@ -651,17 +819,23 @@ export const SectionsManager = () => {
                 <div className="space-y-2">
                   <Label>Ngày bắt đầu</Label>
                   <Input
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="dd/mm/yyyy"
                     value={editingForm.startDate}
                     onChange={(event) => setEditingForm({ ...editingForm, startDate: event.target.value })}
+                    onBlur={(event) => normalizeEditDateField("startDate", event.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Ngày kết thúc</Label>
                   <Input
-                    type="date"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="dd/mm/yyyy"
                     value={editingForm.endDate}
                     onChange={(event) => setEditingForm({ ...editingForm, endDate: event.target.value })}
+                    onBlur={(event) => normalizeEditDateField("endDate", event.target.value)}
                   />
                 </div>
               </div>

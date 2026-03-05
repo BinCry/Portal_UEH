@@ -9,7 +9,51 @@ type Context = {
   params: Promise<{ id: string }>;
 };
 
-const toDateOrNull = (value?: string) => (value ? new Date(value) : null);
+const toDateOrNull = (value: string | undefined, label: "Ngày bắt đầu" | "Ngày kết thúc") => {
+  if (!value) return null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const dmySlash = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  const dmyDash = /^(\d{2})-(\d{2})-(\d{4})$/.exec(raw);
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else if (dmySlash) {
+    day = Number(dmySlash[1]);
+    month = Number(dmySlash[2]);
+    year = Number(dmySlash[3]);
+  } else if (dmyDash) {
+    day = Number(dmyDash[1]);
+    month = Number(dmyDash[2]);
+    year = Number(dmyDash[3]);
+  } else {
+    throw new Error(`${label} không đúng định dạng. Vui lòng nhập dạng dd/mm/yyyy hoặc yyyy-mm-dd`);
+  }
+
+  if (year < 1900 || year > 2100) {
+    throw new Error(`${label} không hợp lệ (năm phải từ 1900 đến 2100)`);
+  }
+
+  const normalized = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const valid =
+    normalized.getUTCFullYear() === year &&
+    normalized.getUTCMonth() === month - 1 &&
+    normalized.getUTCDate() === day;
+  if (!valid) {
+    throw new Error(`${label} không hợp lệ`);
+  }
+
+  // Keep date-only stable across timezones by storing at UTC noon.
+  return normalized;
+};
 
 export async function GET(_: Request, context: Context) {
   const auth = await requireApiRole("ADMIN");
@@ -40,7 +84,29 @@ export async function PATCH(request: Request, context: Context) {
   const { id } = await context.params;
 
   try {
+    const currentSection = await prisma.section.findUnique({
+      where: { id },
+      select: { startDate: true, endDate: true },
+    });
+    if (!currentSection) {
+      return fail({ code: "NOT_FOUND", message: "Không tìm thấy LHP" }, 404);
+    }
+
     const body = await parseBody(request, sectionSchema.partial());
+    const nextStartDate =
+      body.startDate !== undefined ? toDateOrNull(body.startDate, "Ngày bắt đầu") : currentSection.startDate;
+    const nextEndDate =
+      body.endDate !== undefined ? toDateOrNull(body.endDate, "Ngày kết thúc") : currentSection.endDate;
+    if (nextStartDate && nextEndDate && nextStartDate.getTime() > nextEndDate.getTime()) {
+      return fail(
+        {
+          code: "INVALID_DATE_RANGE",
+          message: "Ngày bắt đầu không được lớn hơn ngày kết thúc",
+        },
+        400,
+      );
+    }
+
     let roomId = body.roomId;
     let instructorId = body.instructorId;
 
@@ -94,8 +160,8 @@ export async function PATCH(request: Request, context: Context) {
         ...(roomId ? { roomId } : {}),
         ...(body.dayOfWeek ? { dayOfWeek: body.dayOfWeek as DayOfWeek } : {}),
         ...(body.timeSlotId ? { timeSlotId: body.timeSlotId } : {}),
-        ...(body.startDate !== undefined ? { startDate: toDateOrNull(body.startDate) } : {}),
-        ...(body.endDate !== undefined ? { endDate: toDateOrNull(body.endDate) } : {}),
+        ...(body.startDate !== undefined ? { startDate: nextStartDate } : {}),
+        ...(body.endDate !== undefined ? { endDate: nextEndDate } : {}),
         ...(body.capacity !== undefined ? { capacity: body.capacity } : {}),
         ...(body.isWaitingOption !== undefined ? { isWaitingOption: body.isWaitingOption } : {}),
         ...(body.capacityHidden !== undefined ? { capacityHidden: body.capacityHidden } : {}),
@@ -108,7 +174,7 @@ export async function PATCH(request: Request, context: Context) {
     return fail(
       {
         code: "UPDATE_SECTION_FAILED",
-        message: "Không thể cập nhật LHP",
+        message: error instanceof Error ? error.message : "Không thể cập nhật LHP",
         details: error,
       },
       400,

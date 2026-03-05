@@ -5,7 +5,51 @@ import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/route-guards";
 import { sectionSchema } from "@/lib/zod-schemas/admin";
 
-const toDateOrNull = (value?: string) => (value ? new Date(value) : null);
+const toDateOrNull = (value: string | undefined, label: "Ngày bắt đầu" | "Ngày kết thúc") => {
+  if (!value) return null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const dmySlash = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  const dmyDash = /^(\d{2})-(\d{2})-(\d{4})$/.exec(raw);
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (iso) {
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
+  } else if (dmySlash) {
+    day = Number(dmySlash[1]);
+    month = Number(dmySlash[2]);
+    year = Number(dmySlash[3]);
+  } else if (dmyDash) {
+    day = Number(dmyDash[1]);
+    month = Number(dmyDash[2]);
+    year = Number(dmyDash[3]);
+  } else {
+    throw new Error(`${label} không đúng định dạng. Vui lòng nhập dạng dd/mm/yyyy hoặc yyyy-mm-dd`);
+  }
+
+  if (year < 1900 || year > 2100) {
+    throw new Error(`${label} không hợp lệ (năm phải từ 1900 đến 2100)`);
+  }
+
+  const normalized = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const valid =
+    normalized.getUTCFullYear() === year &&
+    normalized.getUTCMonth() === month - 1 &&
+    normalized.getUTCDate() === day;
+  if (!valid) {
+    throw new Error(`${label} không hợp lệ`);
+  }
+
+  // Keep date-only stable across timezones by storing at UTC noon.
+  return normalized;
+};
 
 export async function GET() {
   const auth = await requireApiRole("ADMIN");
@@ -40,6 +84,18 @@ export async function POST(request: Request) {
 
   try {
     const body = await parseBody(request, sectionSchema);
+    const startDate = toDateOrNull(body.startDate, "Ngày bắt đầu");
+    const endDate = toDateOrNull(body.endDate, "Ngày kết thúc");
+    if (startDate && endDate && startDate.getTime() > endDate.getTime()) {
+      return fail(
+        {
+          code: "INVALID_DATE_RANGE",
+          message: "Ngày bắt đầu không được lớn hơn ngày kết thúc",
+        },
+        400,
+      );
+    }
+
     let roomId = body.roomId;
     let instructorId = body.instructorId;
 
@@ -100,8 +156,8 @@ export async function POST(request: Request) {
         roomId,
         dayOfWeek: body.dayOfWeek as DayOfWeek,
         timeSlotId: body.timeSlotId,
-        startDate: toDateOrNull(body.startDate),
-        endDate: toDateOrNull(body.endDate),
+        startDate,
+        endDate,
         capacity: body.capacity,
         isWaitingOption: body.isWaitingOption,
         capacityHidden: body.capacityHidden,
@@ -114,7 +170,7 @@ export async function POST(request: Request) {
     return fail(
       {
         code: "CREATE_SECTION_FAILED",
-        message: "Không thể tạo LHP",
+        message: error instanceof Error ? error.message : "Không thể tạo LHP",
         details: error,
       },
       400,
