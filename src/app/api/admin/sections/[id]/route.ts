@@ -1,4 +1,5 @@
-import { DayOfWeek } from "@prisma/client";
+﻿import { DayOfWeek, EnrollmentStatus } from "@prisma/client";
+import { validateSeatCounters } from "@/domain/policies/capacity";
 import { fail, ok } from "@/lib/api";
 import { parseBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -68,7 +69,6 @@ export async function GET(_: Request, context: Context) {
           waitingRoom: true,
         },
       },
-      instructor: true,
       room: true,
       timeSlot: true,
     },
@@ -86,7 +86,7 @@ export async function PATCH(request: Request, context: Context) {
   try {
     const currentSection = await prisma.section.findUnique({
       where: { id },
-      select: { startDate: true, endDate: true },
+      select: { startDate: true, endDate: true, capacity: true, registeredCount: true, reservedCount: true },
     });
     if (!currentSection) {
       return fail({ code: "NOT_FOUND", message: "Không tìm thấy LHP" }, 404);
@@ -108,7 +108,6 @@ export async function PATCH(request: Request, context: Context) {
     }
 
     let roomId = body.roomId;
-    let instructorId = body.instructorId;
 
     if (!roomId && body.room) {
       const roomCode = body.room.code.trim().toUpperCase();
@@ -131,24 +130,23 @@ export async function PATCH(request: Request, context: Context) {
       roomId = room.id;
     }
 
-    if (!instructorId && body.instructorName) {
-      const normalizedName = body.instructorName.trim();
-      const existingInstructor = await prisma.instructor.findFirst({
-        where: {
-          name: { equals: normalizedName, mode: "insensitive" },
-        },
-      });
+    const enrolledCount = await prisma.enrollment.count({
+      where: {
+        sectionId: id,
+        status: EnrollmentStatus.ENROLLED,
+      },
+    });
 
-      if (existingInstructor) {
-        instructorId = existingInstructor.id;
-      } else {
-        const createdInstructor = await prisma.instructor.create({
-          data: {
-            name: normalizedName,
-          },
-        });
-        instructorId = createdInstructor.id;
-      }
+    const nextCapacity = body.capacity ?? currentSection.capacity;
+    const nextRegisteredCount = body.registeredCount ?? currentSection.registeredCount;
+    const seatCounterError = validateSeatCounters({
+      capacity: nextCapacity,
+      registeredCount: nextRegisteredCount,
+      reservedCount: currentSection.reservedCount,
+      enrolledCount,
+    });
+    if (seatCounterError) {
+      return fail({ code: "INVALID_CAPACITY_STATE", message: seatCounterError }, 400);
     }
 
     const section = await prisma.section.update({
@@ -156,7 +154,6 @@ export async function PATCH(request: Request, context: Context) {
       data: {
         ...(body.code ? { code: body.code } : {}),
         ...(body.courseId ? { courseId: body.courseId } : {}),
-        ...(instructorId ? { instructorId } : {}),
         ...(roomId ? { roomId } : {}),
         ...(body.dayOfWeek ? { dayOfWeek: body.dayOfWeek as DayOfWeek } : {}),
         ...(body.timeSlotId ? { timeSlotId: body.timeSlotId } : {}),

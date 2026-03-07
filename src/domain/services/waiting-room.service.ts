@@ -1,11 +1,9 @@
 import { ApprovalStatus } from "@prisma/client";
 import { WAITING_BUFFER_DEFAULT, WAITING_SLA_HOURS } from "@/lib/constants";
+import { shouldActivateWaitingRoom } from "@/domain/policies/waiting-room";
 import { prisma } from "@/lib/prisma";
 import { addHoursFromNow, now } from "@/lib/time";
 import { notificationService } from "@/domain/services/notification.service";
-
-const getSectionAvailableSlots = (capacity: number, registered: number, reserved: number) =>
-  capacity - registered - reserved;
 
 export const waitingRoomService = {
   async getOrCreateByCourse(courseId: string, buffer = WAITING_BUFFER_DEFAULT) {
@@ -41,12 +39,7 @@ export const waitingRoomService = {
     if (!sections.length) return null;
 
     const room = await this.getOrCreateByCourse(courseId);
-    const allFull = sections.every((s) => getSectionAvailableSlots(s.capacity, s.registeredCount, s.reservedCount) <= 0);
-    const anyNearFull = sections.some(
-      (s) => getSectionAvailableSlots(s.capacity, s.registeredCount, s.reservedCount) <= room.buffer,
-    );
-
-    if (!allFull && !anyNearFull) return room;
+    if (!shouldActivateWaitingRoom(sections)) return room;
 
     if (!room.isActive) {
       const activatedAt = now();

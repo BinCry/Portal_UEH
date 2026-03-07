@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { DayOfWeek, SectionStatus } from "@prisma/client";
@@ -12,15 +12,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TIMEZONE } from "@/lib/constants";
+import { formatSectionScheduleSummary } from "@/lib/section-display";
 
 type Course = { id: string; code: string; name: string; planType: "IN_PLAN" | "OUT_PLAN" };
-type TimeSlot = { id: string; label: string };
+type TimeSlot = { id: string; label: string; startTime: string; endTime: string };
 
 type Section = {
   id: string;
   code: string;
   courseId: string;
-  instructorId: string;
   roomId: string;
   dayOfWeek: DayOfWeek;
   timeSlotId: string;
@@ -41,10 +41,6 @@ type Section = {
       isActive: boolean;
     } | null;
   };
-  instructor: {
-    id: string;
-    name: string;
-  };
   room: {
     id: string;
     code: string;
@@ -56,13 +52,14 @@ type Section = {
   timeSlot: {
     id: string;
     label: string;
+    startTime: string;
+    endTime: string;
   };
 };
 
 type SectionForm = {
   code: string;
   courseId: string;
-  instructorName: string;
   roomCode: string;
   roomCampus: string;
   roomAddress: string;
@@ -73,6 +70,7 @@ type SectionForm = {
   startDate: string;
   endDate: string;
   capacity: number;
+  registeredCount: number;
   capacityHidden: boolean;
   isWaitingOption: boolean;
   status: SectionStatus;
@@ -181,7 +179,6 @@ const getDateTimestamp = (value: string) => {
 const initialForm: SectionForm = {
   code: "",
   courseId: "",
-  instructorName: "",
   roomCode: "",
   roomCampus: "",
   roomAddress: "",
@@ -192,6 +189,7 @@ const initialForm: SectionForm = {
   startDate: "",
   endDate: "",
   capacity: 40,
+  registeredCount: 0,
   capacityHidden: false,
   isWaitingOption: false,
   status: SectionStatus.OPEN,
@@ -200,7 +198,6 @@ const initialForm: SectionForm = {
 const toPayload = (form: SectionForm) => ({
   code: form.code.trim(),
   courseId: form.courseId,
-  instructorName: form.instructorName.trim(),
   room: {
     code: form.roomCode.trim().toUpperCase(),
     campus: form.roomCampus.trim() || undefined,
@@ -213,6 +210,7 @@ const toPayload = (form: SectionForm) => ({
   startDate: toApiDateValue(form.startDate),
   endDate: toApiDateValue(form.endDate),
   capacity: form.capacity,
+  registeredCount: form.registeredCount,
   capacityHidden: form.capacityHidden,
   isWaitingOption: form.isWaitingOption,
   status: form.status,
@@ -221,7 +219,6 @@ const toPayload = (form: SectionForm) => ({
 const sectionToForm = (section: Section): SectionForm => ({
   code: section.code,
   courseId: section.courseId,
-  instructorName: section.instructor.name,
   roomCode: section.room.code ?? "",
   roomCampus: section.room.campus ?? "",
   roomAddress: section.room.address ?? "",
@@ -232,10 +229,23 @@ const sectionToForm = (section: Section): SectionForm => ({
   startDate: toDateInputValue(section.startDate),
   endDate: toDateInputValue(section.endDate),
   capacity: section.capacity,
+  registeredCount: section.registeredCount,
   capacityHidden: section.capacityHidden,
   isWaitingOption: section.isWaitingOption,
   status: section.status,
 });
+
+const renderSectionSchedule = (section: Section) =>
+  formatSectionScheduleSummary({
+    dayOfWeek: section.dayOfWeek,
+    startTime: section.timeSlot.startTime,
+    endTime: section.timeSlot.endTime,
+    startDate: section.startDate,
+    endDate: section.endDate,
+    address: section.room.address,
+    campus: section.room.campus,
+    roomCode: section.room.code,
+  });
 
 export const SectionsManager = () => {
   const [sections, setSections] = useState<Section[]>([]);
@@ -317,10 +327,7 @@ export const SectionsManager = () => {
     const response = await fetch("/api/admin/sections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...toPayload(normalizedForm),
-        registeredCount: 0,
-      }),
+      body: JSON.stringify(toPayload(normalizedForm)),
     });
     const payload = await response.json();
     if (!response.ok || !payload.success) {
@@ -447,16 +454,6 @@ export const SectionsManager = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Giảng viên</Label>
-              <Input
-                value={form.instructorName}
-                onChange={(event) => setForm({ ...form, instructorName: event.target.value })}
-                placeholder="Nhập tên giảng viên"
-                required
-              />
-            </div>
-
             <div className="rounded-2xl border border-cyan-200/80 bg-white/65 p-3">
               <p className="mb-2 text-sm font-semibold text-slate-700">Thông tin phòng học</p>
               <div className="grid grid-cols-2 gap-3">
@@ -565,9 +562,25 @@ export const SectionsManager = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Sĩ số tối đa</Label>
-              <Input type="number" min={1} value={form.capacity} onChange={(event) => setForm({ ...form, capacity: Number(event.target.value) })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Sĩ số tối đa</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={form.capacity}
+                  onChange={(event) => setForm({ ...form, capacity: Number(event.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Sĩ số đã đăng ký</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={form.registeredCount}
+                  onChange={(event) => setForm({ ...form, registeredCount: Number(event.target.value) })}
+                />
+              </div>
             </div>
 
             <label className="flex items-start gap-2 text-sm">
@@ -599,39 +612,38 @@ export const SectionsManager = () => {
           <CardTitle>Danh sách lớp học phần</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="min-w-[1680px] table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Mã LHP</TableHead>
-                <TableHead>Học phần</TableHead>
-                <TableHead>Loại lớp</TableHead>
-                <TableHead>Cơ sở học</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Sĩ số</TableHead>
-                <TableHead>Waiting</TableHead>
-                <TableHead className="text-right">Tác vụ</TableHead>
+                <TableHead className="w-[170px]">Mã LHP</TableHead>
+                <TableHead className="w-[280px]">Học phần</TableHead>
+                <TableHead className="w-[180px]">Loại lớp</TableHead>
+                <TableHead className="w-[380px]">Lịch học & cơ sở</TableHead>
+                <TableHead className="w-[120px]">Trạng thái</TableHead>
+                <TableHead className="w-[90px]">Sĩ số</TableHead>
+                <TableHead className="w-[110px]">Waiting</TableHead>
+                <TableHead className="w-[310px] text-right">Tác vụ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sections.map((section) => (
                 <TableRow key={section.id}>
-                  <TableCell>{section.code}</TableCell>
-                  <TableCell>
+                  <TableCell className="max-w-[170px] align-top whitespace-normal break-all leading-snug">{section.code}</TableCell>
+                  <TableCell className="max-w-[280px] align-top whitespace-normal break-words leading-snug">
                     {section.course.code} - {section.course.name}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top whitespace-normal">
                     <Badge variant={section.isWaitingOption ? "default" : "secondary"}>
                       {section.isWaitingOption ? "Lớp phòng chờ (ẩn)" : "Lớp đăng ký thường"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <p className="text-sm font-medium">{section.room.campus ?? "Cơ sở UEH"}</p>
-                    <p className="text-muted-foreground text-xs">{section.room.address ?? "Đang cập nhật địa chỉ"}</p>
+                  <TableCell className="max-w-[380px] align-top whitespace-normal break-words text-sm leading-relaxed">
+                    {renderSectionSchedule(section)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Badge variant={section.status === "OPEN" ? "default" : "secondary"}>{section.status}</Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top">
                     {section.capacityHidden && !section.course.waitingRoom?.isActive ? (
                       <span className="text-muted-foreground text-xs">Ẩn (capacity_hidden=true)</span>
                     ) : (
@@ -640,21 +652,28 @@ export const SectionsManager = () => {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Badge variant={section.course.waitingRoom?.isActive ? "default" : "secondary"}>
                       {section.course.waitingRoom?.isActive ? "ĐANG MỞ" : "CHƯA MỞ"}
                     </Badge>
                   </TableCell>
-                  <TableCell className="space-x-2 text-right">
-                    <Button variant="outline" onClick={() => openEdit(section)}>
-                      Chi tiết / Sửa
-                    </Button>
-                    <Button variant="outline" disabled={!section.canEditCapacity} onClick={() => void updateCapacity(section)}>
-                      Cập nhật sĩ số
-                    </Button>
-                    <Button variant="destructive" onClick={() => void deleteSection(section.id)}>
-                      Xóa
-                    </Button>
+                  <TableCell className="align-top text-right">
+                    <div className="flex flex-wrap justify-end gap-2 whitespace-normal">
+                      <Button variant="outline" className="whitespace-nowrap" onClick={() => openEdit(section)}>
+                        Chi tiết / Sửa
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="whitespace-nowrap"
+                        disabled={!section.canEditCapacity}
+                        onClick={() => void updateCapacity(section)}
+                      >
+                        Cập nhật sĩ số
+                      </Button>
+                      <Button variant="destructive" className="whitespace-nowrap" onClick={() => void deleteSection(section.id)}>
+                        Xóa
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -703,31 +722,20 @@ export const SectionsManager = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Học phần</Label>
-                  <Select value={editingForm.courseId} onValueChange={(value) => setEditingForm({ ...editingForm, courseId: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn học phần" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.code} - {course.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Giảng viên</Label>
-                  <Input
-                    value={editingForm.instructorName}
-                    onChange={(event) => setEditingForm({ ...editingForm, instructorName: event.target.value })}
-                    placeholder="Nhập tên giảng viên"
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label>Học phần</Label>
+                <Select value={editingForm.courseId} onValueChange={(value) => setEditingForm({ ...editingForm, courseId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Chọn học phần" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.code} - {course.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="rounded-xl border border-cyan-200/70 bg-white/60 p-3">
@@ -840,14 +848,25 @@ export const SectionsManager = () => {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Sĩ số tối đa</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={editingForm.capacity}
-                  onChange={(event) => setEditingForm({ ...editingForm, capacity: Number(event.target.value) })}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Sĩ số tối đa</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={editingForm.capacity}
+                    onChange={(event) => setEditingForm({ ...editingForm, capacity: Number(event.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sĩ số đã đăng ký</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={editingForm.registeredCount}
+                    onChange={(event) => setEditingForm({ ...editingForm, registeredCount: Number(event.target.value) })}
+                  />
+                </div>
               </div>
 
               <label className="flex items-start gap-2 text-sm">

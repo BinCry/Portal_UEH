@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import { PageTransition } from "@/components/shared/page-transition";
 import { SectionsTable } from "@/components/student/sections-table";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,6 @@ export default async function StudentSectionsPage({ params }: Props) {
   const buffer = waitingRoom?.buffer ?? 5;
 
   const sectionInclude = {
-    instructor: true,
     room: true,
     timeSlot: true,
   } as const;

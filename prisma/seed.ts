@@ -91,7 +91,6 @@ const main = async () => {
     prisma.section.deleteMany(),
     prisma.timeSlot.deleteMany(),
     prisma.room.deleteMany(),
-    prisma.instructor.deleteMany(),
     prisma.course.deleteMany(),
     prisma.passwordResetOtp.deleteMany(),
     prisma.studentProfile.deleteMany(),
@@ -132,23 +131,6 @@ const main = async () => {
     });
     students.push(user);
   }
-
-  const instructorNames = [
-    "TS. Nguyen Van A",
-    "ThS. Tran Thi B",
-    "TS. Le Hoang C",
-    "ThS. Pham Minh D",
-  ];
-  const instructors = await Promise.all(
-    instructorNames.map((name, index) =>
-      prisma.instructor.create({
-        data: {
-          name,
-          email: `gv${index + 1}@ueh.edu.vn`,
-        },
-      }),
-    ),
-  );
 
   const roomMap = new Map<string, string>();
   const slotMap = new Map<string, string>();
@@ -207,7 +189,6 @@ const main = async () => {
         data: {
           code: section.sectionCode,
           courseId: createdCourse.id,
-          instructorId: instructors[(courseIndex + sectionIndex) % instructors.length].id,
           roomId: roomMap.get(`${section.roomCode}|${section.campus}|${section.address}`)!,
           dayOfWeek: section.dayOfWeek,
           timeSlotId: slotMap.get(section.timeSlotLabel)!,
@@ -245,7 +226,6 @@ const main = async () => {
       data: {
         code: `${baseSection.code}-WR${index + 1}`,
         courseId: baseSection.courseId,
-        instructorId: baseSection.instructorId,
         roomId: baseSection.roomId,
         dayOfWeek: baseSection.dayOfWeek,
         timeSlotId: baseSection.timeSlotId,

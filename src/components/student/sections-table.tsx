@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Info, Loader2, MapPin, Search, ShieldCheck } from "lucide-react";
+import { Info, Loader2, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { dayOfWeekLabel, formatSectionScheduleSummary } from "@/lib/section-display";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,8 @@ type SectionItem = {
   id: string;
   code: string;
   dayOfWeek: string;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
   timeSlot: {
     label: string;
     startTime: string;
@@ -43,19 +46,6 @@ type SectionItem = {
 
 const NONE_PRIORITY = "__NONE__";
 
-const dayOfWeekLabel = (day: string) => {
-  const map: Record<string, string> = {
-    MONDAY: "Thứ Hai",
-    TUESDAY: "Thứ Ba",
-    WEDNESDAY: "Thứ Tư",
-    THURSDAY: "Thứ Năm",
-    FRIDAY: "Thứ Sáu",
-    SATURDAY: "Thứ Bảy",
-    SUNDAY: "Chủ Nhật",
-  };
-  return map[day] ?? day;
-};
-
 const parsePayload = async (response: Response) => {
   try {
     return (await response.json()) as {
@@ -67,6 +57,18 @@ const parsePayload = async (response: Response) => {
     return null;
   }
 };
+
+const getScheduleSummary = (section: SectionItem) =>
+  formatSectionScheduleSummary({
+    dayOfWeek: section.dayOfWeek,
+    startTime: section.timeSlot.startTime,
+    endTime: section.timeSlot.endTime,
+    startDate: section.startDate,
+    endDate: section.endDate,
+    address: section.room.address,
+    campus: section.room.campus,
+    roomCode: section.room.code,
+  });
 
 export const SectionsTable = ({
   courseId,
@@ -101,10 +103,8 @@ export const SectionsTable = ({
   const filteredSections = useMemo(() => {
     return sections.filter((section) => {
       const matchCode = section.code.toLowerCase().includes(searchCode.toLowerCase());
-      const scheduleText = `${dayOfWeekLabel(section.dayOfWeek)} ${section.timeSlot.label} ${section.timeSlot.startTime} ${
-        section.timeSlot.endTime
-      } ${section.room.code} ${section.room.address || ""}`;
-      const matchSchedule = scheduleText.toLowerCase().includes(searchSchedule.toLowerCase());
+      const scheduleText = getScheduleSummary(section).toLowerCase();
+      const matchSchedule = scheduleText.includes(searchSchedule.toLowerCase());
       return matchCode && matchSchedule;
     });
   }, [sections, searchCode, searchSchedule]);
@@ -208,11 +208,11 @@ export const SectionsTable = ({
         </div>
         <div className="space-y-2">
           <Label htmlFor="searchSchedule" className="text-xs font-semibold">
-            Nội dung Lịch học
+            Nội dung lịch học
           </Label>
           <Input
             id="searchSchedule"
-            placeholder="Thứ, ca học, phòng..."
+            placeholder="Thứ, giờ học, địa điểm..."
             value={searchSchedule}
             onChange={(event) => setSearchSchedule(event.target.value)}
           />
@@ -226,7 +226,8 @@ export const SectionsTable = ({
         <div className="flex gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           <Info className="size-5 shrink-0 text-amber-600" />
           <span>
-            Phòng chờ sẽ được mở khi có lớp học phần đã đầy. Bạn có thể chọn lớp bổ sung khi trạng thái này kích hoạt.
+            Phòng chờ sẽ được mở khi tất cả lớp học phần của môn này chỉ còn tối đa 5 slot trống. Bạn có thể chọn lớp bổ sung khi
+            trạng thái này được kích hoạt.
           </span>
         </div>
       ) : null}
@@ -276,22 +277,9 @@ export const SectionsTable = ({
                       section.code
                     )}
                   </TableCell>
-                  <TableCell className="border-r text-center">
-                    {section.capacityHidden ? "-" : (section.registeredCount ?? 0)}
-                  </TableCell>
+                  <TableCell className="border-r text-center">{section.capacityHidden ? "-" : (section.registeredCount ?? 0)}</TableCell>
                   <TableCell className="border-r text-center">{section.capacityHidden ? "-" : section.availableSlots}</TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">
-                        {dayOfWeekLabel(section.dayOfWeek)}, {section.timeSlot.startTime}-{section.timeSlot.endTime},{" "}
-                        {section.room.code}
-                      </p>
-                      <p className="text-muted-foreground flex items-start gap-1 text-xs">
-                        <MapPin className="mt-0.5 size-3 shrink-0" />
-                        <span>{section.room.campus ?? "Cơ sở UEH"}, {section.room.address ?? "Đang cập nhật"}</span>
-                      </p>
-                    </div>
-                  </TableCell>
+                  <TableCell className="text-sm leading-relaxed">{getScheduleSummary(section)}</TableCell>
                 </TableRow>
               ))
             )}

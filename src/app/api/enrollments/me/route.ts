@@ -1,4 +1,4 @@
-import { EnrollmentStatus, WaitingEntryState } from "@prisma/client";
+﻿import { EnrollmentStatus, WaitingEntryState } from "@prisma/client";
 import { fail, ok } from "@/lib/api";
 import { withApiTiming } from "@/lib/api-timing";
 import { prisma } from "@/lib/prisma";
@@ -25,6 +25,8 @@ export async function GET() {
             select: {
               code: true,
               dayOfWeek: true,
+              startDate: true,
+              endDate: true,
               course: {
                 select: {
                   code: true,
@@ -35,11 +37,14 @@ export async function GET() {
                 select: {
                   campus: true,
                   code: true,
+                  address: true,
                 },
               },
               timeSlot: {
                 select: {
                   label: true,
+                  startTime: true,
+                  endTime: true,
                 },
               },
             },

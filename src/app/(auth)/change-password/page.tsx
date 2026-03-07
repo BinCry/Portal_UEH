@@ -17,7 +17,7 @@ const normalizeAccountToEmail = (value: string) => {
   const normalized = value.trim();
   if (!normalized) return "";
   if (normalized.includes("@")) return normalized.toLowerCase();
-  return `${normalized}@st.ueh.edu.vn`;
+  return `${normalized}@ueh.edu.vn`;
 };
 
 export default function ChangePasswordPage() {

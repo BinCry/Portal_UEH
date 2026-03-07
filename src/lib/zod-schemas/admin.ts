@@ -13,8 +13,6 @@ export const courseSchema = z.object({
 export const sectionSchema = z.object({
   code: z.string().min(2).max(40),
   courseId: z.string().min(1),
-  instructorId: z.string().min(1).optional(),
-  instructorName: z.string().trim().min(2).max(120).optional(),
   roomId: z.string().min(1).optional(),
   room: z
     .object({
@@ -39,11 +37,6 @@ export const sectionSchema = z.object({
 export const updateCapacitySchema = z.object({
   capacity: z.int().min(1).max(1000),
   override: z.boolean().optional().default(false),
-});
-
-export const instructorSchema = z.object({
-  name: z.string().min(2).max(120),
-  email: z.email().optional().or(z.literal("")),
 });
 
 export const roomSchema = z.object({

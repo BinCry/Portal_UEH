@@ -1,4 +1,4 @@
-import { computeStudentSectionStatus } from "@/domain/policies/schedule";
+﻿import { computeStudentSectionStatus } from "@/domain/policies/schedule";
 import { waitingRoomService } from "@/domain/services/waiting-room.service";
 import { fail, ok } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
@@ -13,12 +13,13 @@ const mapSectionForStudent = (
     id: string;
     code: string;
     dayOfWeek: string;
+    startDate: Date | null;
+    endDate: Date | null;
     capacity: number;
     capacityHidden: boolean;
     registeredCount: number;
     reservedCount: number;
     isWaitingOption: boolean;
-    instructor: { id: string; name: string; email: string | null };
     room: { id: string; code: string; campus: string | null; address: string | null; building: string; capacity: number };
     timeSlot: { id: string; label: string; startTime: string; endTime: string };
   },
@@ -91,7 +92,6 @@ export async function GET(_: Request, context: Context) {
   const waitingActive = Boolean(waitingRoom?.isActive);
 
   const includeConfig = {
-    instructor: true,
     room: true,
     timeSlot: true,
   } as const;

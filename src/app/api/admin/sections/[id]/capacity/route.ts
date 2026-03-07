@@ -1,9 +1,10 @@
 import { fail, ok } from "@/lib/api";
-import { canUpdateCapacity } from "@/domain/policies/capacity";
+import { canUpdateCapacity, validateSeatCounters } from "@/domain/policies/capacity";
 import { parseBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { requireApiRole } from "@/lib/route-guards";
 import { updateCapacitySchema } from "@/lib/zod-schemas/admin";
+import { EnrollmentStatus } from "@prisma/client";
 
 type Context = {
   params: Promise<{ id: string }>;
@@ -47,6 +48,22 @@ export async function PATCH(request: Request, context: Context) {
         },
         403,
       );
+    }
+
+    const enrolledCount = await prisma.enrollment.count({
+      where: {
+        sectionId: section.id,
+        status: EnrollmentStatus.ENROLLED,
+      },
+    });
+    const seatCounterError = validateSeatCounters({
+      capacity: body.capacity,
+      registeredCount: section.registeredCount,
+      reservedCount: section.reservedCount,
+      enrolledCount,
+    });
+    if (seatCounterError) {
+      return fail({ code: "INVALID_CAPACITY_STATE", message: seatCounterError }, 400);
     }
 
     const updated = await prisma.section.update({

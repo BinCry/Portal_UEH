@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { formatSectionScheduleSummary } from "@/lib/section-display";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,6 +25,8 @@ type WaitingItem = {
   offerSection: {
     code: string;
     dayOfWeek: string;
+    startDate?: string | null;
+    endDate?: string | null;
     room: {
       campus: string | null;
       code: string;
@@ -45,6 +48,8 @@ type EnrollmentItem = {
     id?: string;
     code: string;
     dayOfWeek: string;
+    startDate?: string | null;
+    endDate?: string | null;
     course: {
       code: string;
       name: string;
@@ -52,9 +57,12 @@ type EnrollmentItem = {
     room: {
       campus: string | null;
       code: string;
+      address?: string | null;
     };
     timeSlot: {
       label: string;
+      startTime?: string;
+      endTime?: string;
     };
   };
 };
@@ -84,6 +92,32 @@ const waitingStateLabel: Record<WaitingItem["state"], string> = {
   EXPIRED: "Hết hạn",
   FAILED: "Không khớp lịch",
   DEFERRED: "Tạm hoãn",
+};
+
+const formatScheduleFromEnrollment = (item: EnrollmentItem) =>
+  formatSectionScheduleSummary({
+    dayOfWeek: item.section.dayOfWeek,
+    startTime: item.section.timeSlot.startTime,
+    endTime: item.section.timeSlot.endTime,
+    startDate: item.section.startDate,
+    endDate: item.section.endDate,
+    address: item.section.room.address,
+    campus: item.section.room.campus,
+    roomCode: item.section.room.code,
+  });
+
+const formatScheduleFromWaiting = (item: WaitingItem) => {
+  if (!item.offerSection) return "Đang cập nhật";
+  return formatSectionScheduleSummary({
+    dayOfWeek: item.offerSection.dayOfWeek,
+    startTime: item.offerSection.timeSlot.startTime,
+    endTime: item.offerSection.timeSlot.endTime,
+    startDate: item.offerSection.startDate,
+    endDate: item.offerSection.endDate,
+    address: item.offerSection.room.address,
+    campus: item.offerSection.room.campus,
+    roomCode: item.offerSection.room.code,
+  });
 };
 
 export const WaitingHistory = () => {
@@ -144,6 +178,8 @@ export const WaitingHistory = () => {
         section: {
           code: target.offerSection.code,
           dayOfWeek: target.offerSection.dayOfWeek,
+          startDate: target.offerSection.startDate,
+          endDate: target.offerSection.endDate,
           course: {
             code: target.waitingRoom.course.code,
             name: target.waitingRoom.course.name,
@@ -151,9 +187,12 @@ export const WaitingHistory = () => {
           room: {
             campus: target.offerSection.room.campus,
             code: target.offerSection.room.code,
+            address: target.offerSection.room.address,
           },
           timeSlot: {
             label: target.offerSection.timeSlot.label,
+            startTime: target.offerSection.timeSlot.startTime,
+            endTime: target.offerSection.timeSlot.endTime,
           },
         },
       };
@@ -215,8 +254,7 @@ export const WaitingHistory = () => {
       title: `${item.section.course.code} - ${item.section.course.name}`,
       rows: [
         { label: "Lớp học phần", value: item.section.code },
-        { label: "Lịch học", value: `${item.section.dayOfWeek} - ${item.section.timeSlot.label}` },
-        { label: "Cơ sở", value: `${item.section.room.campus ?? "UEH"} - ${item.section.room.code}` },
+        { label: "Lịch học & địa chỉ", value: formatScheduleFromEnrollment(item) },
         { label: "Nguồn đăng ký", value: sourceLabel(item.source) },
       ],
     });
@@ -239,12 +277,7 @@ export const WaitingHistory = () => {
       title: `${item.waitingRoom.course.code} - ${item.waitingRoom.course.name}`,
       rows: [
         { label: "Lớp đề xuất", value: item.offerSection.code },
-        {
-          label: "Lịch học",
-          value: `${item.offerSection.dayOfWeek} - ${item.offerSection.timeSlot.label} (${item.offerSection.timeSlot.startTime}-${item.offerSection.timeSlot.endTime})`,
-        },
-        { label: "Phòng học", value: `${item.offerSection.room.campus ?? "UEH"} - ${item.offerSection.room.code}` },
-        { label: "Địa chỉ", value: item.offerSection.room.address ?? "Đang cập nhật" },
+        { label: "Lịch học & địa chỉ", value: formatScheduleFromWaiting(item) },
         { label: "Trạng thái", value: waitingStateLabel[item.state] },
         { label: "Ưu tiên khớp", value: item.matchedPriority ? `P${item.matchedPriority}` : "-" },
       ],
@@ -263,40 +296,36 @@ export const WaitingHistory = () => {
         {enrollments.length === 0 ? (
           <p className="text-muted-foreground text-sm">Chưa có học phần đã đăng ký.</p>
         ) : (
-          <Table>
+          <Table className="min-w-[1120px] table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Học phần</TableHead>
-                <TableHead>LHP</TableHead>
-                <TableHead>Thời khóa biểu</TableHead>
-                <TableHead>Cơ sở</TableHead>
-                <TableHead>Nguồn đăng ký</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
+                <TableHead className="w-[260px]">Học phần</TableHead>
+                <TableHead className="w-[170px]">LHP</TableHead>
+                <TableHead className="w-[430px]">Lịch học & địa chỉ</TableHead>
+                <TableHead className="w-[160px]">Nguồn đăng ký</TableHead>
+                <TableHead className="w-[150px] text-right">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {enrollments.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
+                  <TableCell className="align-top whitespace-normal">
                     <button className="text-left hover:underline" type="button" onClick={() => openEnrollmentDetail(item)}>
                       <p className="font-medium">{item.section.course.code}</p>
                       <p className="text-muted-foreground text-xs">{item.section.course.name}</p>
                     </button>
                   </TableCell>
-                  <TableCell>{item.section.code}</TableCell>
-                  <TableCell>
-                    {item.section.dayOfWeek} - {item.section.timeSlot.label}
+                  <TableCell className="align-top">{item.section.code}</TableCell>
+                  <TableCell className="max-w-[430px] align-top whitespace-normal break-words text-sm leading-relaxed">
+                    {formatScheduleFromEnrollment(item)}
                   </TableCell>
-                  <TableCell>
-                    {(item.section.room.campus ?? "UEH")} - {item.section.room.code}
-                  </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Badge variant={item.source === "WAITING_ROOM" ? "default" : "secondary"}>{sourceLabel(item.source)}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="align-top text-right">
                     <Button
                       variant="outline"
-                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 whitespace-nowrap"
                       onClick={() => setCancelTarget(item)}
                       disabled={cancelLoadingId === item.id}
                     >
@@ -412,8 +441,8 @@ export const WaitingHistory = () => {
               </p>
               {cancelTarget.source === "WAITING_ROOM" ? (
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
-                  Phòng chờ kỳ sau: Bạn đang hủy học phần đã xác nhận qua phòng chờ. Vui lòng cân nhắc trách nhiệm với lựa
-                  chọn phòng chờ ở kỳ sau.
+                  Phòng chờ kỳ sau: Bạn đang hủy học phần đã xác nhận qua phòng chờ. Vui lòng cân nhắc trách nhiệm với lựa chọn
+                  phòng chờ ở kỳ sau.
                 </div>
               ) : null}
               <div className="flex justify-end gap-2">

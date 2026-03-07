@@ -207,11 +207,8 @@ export const waitingEntryService = {
                 address: true,
               },
             },
-            instructor: {
-              select: {
-                name: true,
-              },
-            },
+            startDate: true,
+            endDate: true,
           },
         },
       },

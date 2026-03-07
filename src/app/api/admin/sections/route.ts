@@ -1,4 +1,5 @@
 ﻿import { DayOfWeek } from "@prisma/client";
+import { validateSeatCounters } from "@/domain/policies/capacity";
 import { fail, ok } from "@/lib/api";
 import { parseBody } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
@@ -62,7 +63,6 @@ export async function GET() {
           waitingRoom: true,
         },
       },
-      instructor: true,
       room: true,
       timeSlot: true,
     },
@@ -97,7 +97,6 @@ export async function POST(request: Request) {
     }
 
     let roomId = body.roomId;
-    let instructorId = body.instructorId;
 
     if (!roomId && body.room) {
       const roomCode = body.room.code.trim().toUpperCase();
@@ -124,35 +123,20 @@ export async function POST(request: Request) {
       return fail({ code: "INVALID_ROOM", message: "Vui lòng chọn hoặc nhập phòng học hợp lệ" }, 400);
     }
 
-    if (!instructorId && body.instructorName) {
-      const normalizedName = body.instructorName.trim();
-      const existingInstructor = await prisma.instructor.findFirst({
-        where: {
-          name: { equals: normalizedName, mode: "insensitive" },
-        },
-      });
-
-      if (existingInstructor) {
-        instructorId = existingInstructor.id;
-      } else {
-        const createdInstructor = await prisma.instructor.create({
-          data: {
-            name: normalizedName,
-          },
-        });
-        instructorId = createdInstructor.id;
-      }
-    }
-
-    if (!instructorId) {
-      return fail({ code: "INVALID_INSTRUCTOR", message: "Vui lòng nhập tên giảng viên hợp lệ" }, 400);
+    const seatCounterError = validateSeatCounters({
+      capacity: body.capacity,
+      registeredCount: body.registeredCount,
+      reservedCount: 0,
+      enrolledCount: 0,
+    });
+    if (seatCounterError) {
+      return fail({ code: "INVALID_CAPACITY_STATE", message: seatCounterError }, 400);
     }
 
     const section = await prisma.section.create({
       data: {
         code: body.code,
         courseId: body.courseId,
-        instructorId,
         roomId,
         dayOfWeek: body.dayOfWeek as DayOfWeek,
         timeSlotId: body.timeSlotId,
@@ -177,4 +161,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

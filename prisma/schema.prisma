@@ -136,15 +136,6 @@ model Course {
   @@index([faculty, planType, isActive])
 }
 
-model Instructor {
-  id         String    @id @default(cuid())
-  name       String
-  email      String?   @unique
-  sections   Section[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-}
-
 model Room {
   id         String    @id @default(cuid())
   code       String    @unique
@@ -171,7 +162,6 @@ model Section {
   id              String         @id @default(cuid())
   code            String         @unique
   courseId        String
-  instructorId    String
   roomId          String
   dayOfWeek       DayOfWeek
   timeSlotId      String
@@ -186,7 +176,6 @@ model Section {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  instructor      Instructor     @relation(fields: [instructorId], references: [id], onDelete: Restrict)
   room            Room           @relation(fields: [roomId], references: [id], onDelete: Restrict)
   timeSlot        TimeSlot       @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
   enrollments     Enrollment[]
