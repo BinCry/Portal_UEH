@@ -133,24 +133,45 @@ export async function POST(request: Request) {
       return fail({ code: "INVALID_CAPACITY_STATE", message: seatCounterError }, 400);
     }
 
-    const section = await prisma.section.create({
-      data: {
-        code: body.code,
-        courseId: body.courseId,
-        roomId,
-        dayOfWeek: body.dayOfWeek as DayOfWeek,
-        timeSlotId: body.timeSlotId,
-        startDate,
-        endDate,
-        capacity: body.capacity,
-        isWaitingOption: body.isWaitingOption,
-        capacityHidden: body.capacityHidden,
-        registeredCount: body.registeredCount,
-        status: body.status,
-      },
-    });
+    // Validate all required fields before calling Prisma to avoid opaque
+    // "(not available)" error messages from the pg driver adapter.
+    const requiredFields: Record<string, unknown> = {
+      code: body.code,
+      courseId: body.courseId,
+      roomId,
+      dayOfWeek: body.dayOfWeek,
+      timeSlotId: body.timeSlotId,
+      capacity: body.capacity,
+    };
+    for (const [field, value] of Object.entries(requiredFields)) {
+      if (value === null || value === undefined || value === "") {
+        return fail(
+          { code: "MISSING_REQUIRED_FIELD", message: `Thiếu trường bắt buộc: ${field}` },
+          400,
+        );
+      }
+    }
+
+    const createData = {
+      code: body.code,
+      courseId: body.courseId,
+      roomId,
+      dayOfWeek: body.dayOfWeek as DayOfWeek,
+      timeSlotId: body.timeSlotId,
+      startDate: startDate ?? undefined,
+      endDate: endDate ?? undefined,
+      capacity: body.capacity,
+      isWaitingOption: body.isWaitingOption ?? false,
+      capacityHidden: body.capacityHidden ?? false,
+      registeredCount: body.registeredCount ?? 0,
+      status: body.status ?? "OPEN",
+    };
+    console.log("[CREATE_SECTION] data:", JSON.stringify(createData, null, 2));
+
+    const section = await prisma.section.create({ data: createData });
     return ok(section, { status: 201 });
   } catch (error) {
+    console.error("[CREATE_SECTION]", error);
     return fail(
       {
         code: "CREATE_SECTION_FAILED",
