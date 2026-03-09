@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { addHoursFromNow, now } from "@/lib/time";
 import { matchingService } from "@/domain/services/matching.service";
 import { notificationService } from "@/domain/services/notification.service";
+import { formatSectionScheduleSummary } from "@/lib/section-display";
 
 const hasAvailableSlot = (capacity: number, registeredCount: number, reservedCount: number) =>
   capacity - registeredCount - reservedCount > 0;
@@ -37,9 +38,9 @@ const autoApprovePendingEntriesForRoom = async (waitingRoomId: string) => {
         },
       },
       offerSection: {
-        select: {
-          id: true,
-          code: true,
+        include: {
+          timeSlot: true,
+          room: true,
         },
       },
     },
@@ -68,6 +69,19 @@ const autoApprovePendingEntriesForRoom = async (waitingRoomId: string) => {
       expiresAt: expiresAt.toISOString(),
       requiresFinalConfirmation: true,
       autoApproved: true,
+      courseName: entry.waitingRoom.course.name,
+      schedule: entry.offerSection
+        ? formatSectionScheduleSummary({
+          dayOfWeek: entry.offerSection.dayOfWeek,
+          startTime: entry.offerSection.timeSlot.startTime,
+          endTime: entry.offerSection.timeSlot.endTime,
+          startDate: entry.offerSection.startDate,
+          endDate: entry.offerSection.endDate,
+          address: entry.offerSection.room.address,
+          campus: entry.offerSection.room.campus,
+          roomCode: entry.offerSection.room.code,
+        })
+        : undefined,
     });
   }
 
@@ -84,22 +98,22 @@ export const approvalService = {
 
       const approval = pending
         ? await tx.approval.update({
-            where: { id: pending.id },
-            data: {
-              status: ApprovalStatus.APPROVED,
-              approvedById,
-              reason: reason ?? "Phê duyệt thủ công",
-            },
-          })
+          where: { id: pending.id },
+          data: {
+            status: ApprovalStatus.APPROVED,
+            approvedById,
+            reason: reason ?? "Phê duyệt thủ công",
+          },
+        })
         : await tx.approval.create({
-            data: {
-              waitingRoomId,
-              status: ApprovalStatus.APPROVED,
-              approvedById,
-              reason: reason ?? "Phê duyệt thủ công",
-              dueAt: now(),
-            },
-          });
+          data: {
+            waitingRoomId,
+            status: ApprovalStatus.APPROVED,
+            approvedById,
+            reason: reason ?? "Phê duyệt thủ công",
+            dueAt: now(),
+          },
+        });
 
       const room = await tx.waitingRoom.findUnique({
         where: { id: waitingRoomId },
@@ -178,22 +192,22 @@ export const approvalService = {
 
       const approval = pending
         ? await tx.approval.update({
-            where: { id: pending.id },
-            data: {
-              status: ApprovalStatus.REJECTED,
-              approvedById,
-              reason,
-            },
-          })
+          where: { id: pending.id },
+          data: {
+            status: ApprovalStatus.REJECTED,
+            approvedById,
+            reason,
+          },
+        })
         : await tx.approval.create({
-            data: {
-              waitingRoomId,
-              status: ApprovalStatus.REJECTED,
-              approvedById,
-              reason,
-              dueAt: now(),
-            },
-          });
+          data: {
+            waitingRoomId,
+            status: ApprovalStatus.REJECTED,
+            approvedById,
+            reason,
+            dueAt: now(),
+          },
+        });
 
       const room = await tx.waitingRoom.findUnique({
         where: { id: waitingRoomId },
@@ -299,7 +313,7 @@ export const approvalService = {
             },
           },
           offerSection: {
-            select: { id: true, code: true },
+            include: { timeSlot: true, room: true },
           },
         },
       });
@@ -331,7 +345,7 @@ export const approvalService = {
             },
           },
           offerSection: {
-            select: { id: true, code: true },
+            include: { timeSlot: true, room: true },
           },
         },
       });
@@ -348,6 +362,19 @@ export const approvalService = {
         matchedPriority: entry.matchedPriority,
         expiresAt: expiresAt.toISOString(),
         requiresFinalConfirmation: true,
+        courseName: entry.waitingRoom.course.name,
+        schedule: entry.offerSection
+          ? formatSectionScheduleSummary({
+            dayOfWeek: entry.offerSection.dayOfWeek,
+            startTime: entry.offerSection.timeSlot.startTime,
+            endTime: entry.offerSection.timeSlot.endTime,
+            startDate: entry.offerSection.startDate,
+            endDate: entry.offerSection.endDate,
+            address: entry.offerSection.room.address,
+            campus: entry.offerSection.room.campus,
+            roomCode: entry.offerSection.room.code,
+          })
+          : undefined,
       }),
       notificationService.createForAdmins(
         NotificationType.SYSTEM,
