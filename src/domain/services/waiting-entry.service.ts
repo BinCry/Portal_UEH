@@ -1,6 +1,8 @@
-import { Prisma, WaitingEntryState } from "@prisma/client";
+﻿import { Prisma, WaitingEntryState } from "@prisma/client";
+import { DomainError } from "@/domain/errors/domain-error";
 import { prisma } from "@/lib/prisma";
 import { now } from "@/lib/time";
+import { assertNoActiveEnrollmentForCourse } from "@/domain/services/enrollment-guard.service";
 import { notificationService } from "@/domain/services/notification.service";
 import { waitingRoomService } from "@/domain/services/waiting-room.service";
 import { matchingService } from "@/domain/services/matching.service";
@@ -67,18 +69,24 @@ export const waitingEntryService = {
     ]);
 
     if (!studentProfile?.faculty || !course || course.faculty !== studentProfile.faculty) {
-      throw new Error("Bạn chỉ có thể tham gia phòng chờ của học phần thuộc ngành của mình");
+      throw new Error("Báº¡n chá»‰ cÃ³ thá»ƒ tham gia phÃ²ng chá» cá»§a há»c pháº§n thuá»™c ngÃ nh cá»§a mÃ¬nh");
     }
 
     // Penalty block requirement removed as per user request
 
     const room = await waitingRoomService.evaluateAndActivate(courseId);
     if (!room) {
-      throw new Error("Không tìm thấy phòng chờ cho học phần");
+      throw new Error("KhÃ´ng tÃ¬m tháº¥y phÃ²ng chá» cho há»c pháº§n");
     }
     if (!room.isActive) {
-      throw new Error("Phòng chờ chưa đủ điều kiện kích hoạt");
+      throw new Error("PhÃ²ng chá» chÆ°a Ä‘á»§ Ä‘iá»u kiá»‡n kÃ­ch hoáº¡t");
     }
+
+    await assertNoActiveEnrollmentForCourse({
+      client: prisma,
+      studentId,
+      courseId,
+    });
 
     const priorityIds = priorities.map((item) => item.sectionId);
     const waitingSections = await prisma.section.findMany({
@@ -91,10 +99,10 @@ export const waitingEntryService = {
       select: { id: true },
     });
     if (!waitingSections.length) {
-      throw new Error("Chưa có lớp bổ sung khả dụng cho phòng chờ");
+      throw new Error("ChÆ°a cÃ³ lá»›p bá»• sung kháº£ dá»¥ng cho phÃ²ng chá»");
     }
     if (waitingSections.length !== priorityIds.length) {
-      throw new Error("Nguyện vọng phải là các lớp bổ sung dành cho phòng chờ");
+      throw new Error("Nguyá»‡n vá»ng pháº£i lÃ  cÃ¡c lá»›p bá»• sung dÃ nh cho phÃ²ng chá»");
     }
 
     const existing = await prisma.waitingEntry.findFirst({
@@ -107,34 +115,42 @@ export const waitingEntryService = {
       },
     });
     if (existing) {
-      throw new Error("Bạn đã có yêu cầu đang chờ xử lý");
+      throw new DomainError("WAITING_ACTIVE_ENTRY_EXISTS", "Ban da co yeu cau dang cho xu ly");
     }
 
     const priorityPenaltyActive = isFutureDate(studentProfile.priorityPenaltyUntil);
     if (priorityPenaltyActive && priorities.length < 2) {
-      throw new Error("Bạn đang mất quyền ưu tiên tạm thời, vui lòng chọn ít nhất 2 nguyện vọng");
+      throw new Error("Báº¡n Ä‘ang máº¥t quyá»n Æ°u tiÃªn táº¡m thá»i, vui lÃ²ng chá»n Ã­t nháº¥t 2 nguyá»‡n vá»ng");
     }
-    const entry = await prisma.waitingEntry.create({
-      data: {
-        waitingRoomId: room.id,
-        studentId,
-        termsAcceptedAt: now(),
-        prioritiesJson: priorities as unknown as Prisma.JsonArray,
-        state: WaitingEntryState.QUEUED,
-        reason: priorityPenaltyActive
-          ? `Đang mất quyền ưu tiên tạm thời đến ${studentProfile.priorityPenaltyUntil?.toLocaleString("vi-VN")}`
-          : null,
-      },
-    });
+    let entry;
+    try {
+      entry = await prisma.waitingEntry.create({
+        data: {
+          waitingRoomId: room.id,
+          studentId,
+          termsAcceptedAt: now(),
+          prioritiesJson: priorities as unknown as Prisma.JsonArray,
+          state: WaitingEntryState.QUEUED,
+          reason: priorityPenaltyActive
+            ? `Äang máº¥t quyá»n Æ°u tiÃªn táº¡m thá»i Ä‘áº¿n ${studentProfile.priorityPenaltyUntil?.toLocaleString("vi-VN")}`
+            : null,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new DomainError("WAITING_ACTIVE_ENTRY_EXISTS", "Ban da co yeu cau dang cho xu ly");
+      }
+      throw error;
+    }
 
     const position = await getPosition(room.id, entry.id);
 
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
-        title: "Đã ghi nhận yêu cầu phòng chờ",
+        title: "ÄÃ£ ghi nháº­n yÃªu cáº§u phÃ²ng chá»",
         message: priorityPenaltyActive
-          ? `Bạn đã tham gia phòng chờ học phần ${course.code}. Vì đang mất quyền ưu tiên tạm thời, hệ thống sẽ bỏ qua ưu tiên 1 khi matching. Vị trí FIFO hiện tại: #${position}.`
-          : `Bạn đã tham gia phòng chờ học phần ${course.code}. Vị trí FIFO hiện tại: #${position}.`,
+          ? `Báº¡n Ä‘Ã£ tham gia phÃ²ng chá» há»c pháº§n ${course.code}. VÃ¬ Ä‘ang máº¥t quyá»n Æ°u tiÃªn táº¡m thá»i, há»‡ thá»‘ng sáº½ bá» qua Æ°u tiÃªn 1 khi matching. Vá»‹ trÃ­ FIFO hiá»‡n táº¡i: #${position}.`
+          : `Báº¡n Ä‘Ã£ tham gia phÃ²ng chá» há»c pháº§n ${course.code}. Vá»‹ trÃ­ FIFO hiá»‡n táº¡i: #${position}.`,
         waitingEntryId: entry.id,
         waitingRoomId: room.id,
         courseCode: course.code,
@@ -143,8 +159,8 @@ export const waitingEntryService = {
         priorityPenaltyUntil: studentProfile.priorityPenaltyUntil?.toISOString() ?? null,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "Có yêu cầu phòng chờ mới",
-        message: `${studentProfile.fullName} (${studentProfile.studentCode}) vừa tham gia phòng chờ học phần ${course.code}.`,
+        title: "CÃ³ yÃªu cáº§u phÃ²ng chá» má»›i",
+        message: `${studentProfile.fullName} (${studentProfile.studentCode}) vá»«a tham gia phÃ²ng chá» há»c pháº§n ${course.code}.`,
         waitingEntryId: entry.id,
         waitingRoomId: room.id,
         studentId,
@@ -246,3 +262,4 @@ export const waitingEntryService = {
     }));
   },
 };
+

@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+type AdminSectionRow = {
+    registeredCount: number;
+    course: {
+        code: string;
+    };
+};
+
 const login = async (page: import("@playwright/test").Page, email: string, password: string) => {
     await page.goto("/login");
     await page.getByPlaceholder(/email/i).fill(email);
@@ -32,7 +39,7 @@ test("admin sections capacity drops when student cancels waiting room confirmed 
     // LOG IN AS STUDENT AND CANCEL
     await login(page, "student2@ueh.edu.vn", "123456");
 
-    const [response] = await Promise.all([
+    await Promise.all([
         page.waitForResponse("**/api/enrollments/me"),
         page.goto("/student/waiting")
     ]);
@@ -47,8 +54,11 @@ test("admin sections capacity drops when student cancels waiting room confirmed 
     const courseCode = await row.locator("td").first().innerText();
 
     // Find the capacity text for the section. 
-    const sectionBefore = sectionsBefore.find((s: any) => courseCode.includes(s.course.code) || s.course.code.includes(courseCode.trim()));
-    const initialRegisteredCount = sectionBefore.registeredCount;
+    const sectionBefore = (sectionsBefore as AdminSectionRow[]).find(
+        (s) => courseCode.includes(s.course.code) || s.course.code.includes(courseCode.trim()),
+    );
+    expect(sectionBefore).toBeTruthy();
+    const initialRegisteredCount = sectionBefore!.registeredCount;
     console.log(`Admin sees section (course: ${courseCode}) registeredCount Before:`, initialRegisteredCount);
 
     await cancelLink.click();
@@ -62,8 +72,11 @@ test("admin sections capacity drops when student cancels waiting room confirmed 
     // Check Admin Again
     const sectionsResAfter = await adminPage.request.get("/api/admin/sections");
     const sectionsAfter = (await sectionsResAfter.json()).data;
-    const sectionAfter = sectionsAfter.find((s: any) => courseCode.includes(s.course.code) || s.course.code.includes(courseCode.trim()));
-    const finalRegisteredCount = sectionAfter.registeredCount;
+    const sectionAfter = (sectionsAfter as AdminSectionRow[]).find(
+        (s) => courseCode.includes(s.course.code) || s.course.code.includes(courseCode.trim()),
+    );
+    expect(sectionAfter).toBeTruthy();
+    const finalRegisteredCount = sectionAfter!.registeredCount;
     console.log(`Admin sees section (course: ${courseCode}) registeredCount After:`, finalRegisteredCount);
 
     // Assert it drops

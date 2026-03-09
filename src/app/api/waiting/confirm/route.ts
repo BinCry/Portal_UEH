@@ -3,6 +3,7 @@ import { withApiTiming } from "@/lib/api-timing";
 import { parseBody } from "@/lib/http";
 import { requireApiRole } from "@/lib/route-guards";
 import { waitingDecisionSchema } from "@/lib/zod-schemas/waiting";
+import { isDomainError } from "@/domain/errors/domain-error";
 import { enrollmentService } from "@/domain/services/enrollment.service";
 
 export async function POST(request: Request) {
@@ -17,6 +18,16 @@ export async function POST(request: Request) {
       const result = await enrollmentService.confirmWaitingOffer(auth.user.id, body.waitingEntryId);
       return ok(result);
     } catch (error) {
+      if (isDomainError(error)) {
+        return fail(
+          {
+            code: error.code,
+            message: error.message,
+          },
+          409,
+        );
+      }
+
       return fail(
         {
           code: "CONFIRM_FAILED",

@@ -17,6 +17,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
+    "validate:integrity": "tsx scripts/validate-integrity.ts",
     "seed:parse": "tsx scripts/parse-data-web.ts",
     "prepare": "prisma generate"
   },

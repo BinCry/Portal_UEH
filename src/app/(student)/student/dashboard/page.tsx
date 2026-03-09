@@ -1,6 +1,6 @@
-﻿import { Prisma } from "@prisma/client";
-import { PageTransition } from "@/components/shared/page-transition";
+﻿import { PageTransition } from "@/components/shared/page-transition";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { financeService } from "@/domain/services/finance.service";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -22,18 +22,10 @@ export default async function StudentDashboardPage() {
         },
       },
     }),
-    prisma.financeLedger.aggregate({
-      where: {
-        studentId: session.user.id,
-        status: "POSTED",
-      },
-      _sum: {
-        amount: true,
-      },
-    }),
+    financeService.getValidPostedTotal(session.user.id),
   ]);
 
-  const totalPosted = new Prisma.Decimal(financeTotal._sum.amount ?? 0).toNumber();
+  const totalPosted = financeTotal.toNumber();
 
   return (
     <PageTransition>

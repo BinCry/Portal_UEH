@@ -3,6 +3,7 @@ import { withApiTiming } from "@/lib/api-timing";
 import { parseBody } from "@/lib/http";
 import { requireApiRole } from "@/lib/route-guards";
 import { joinWaitingSchema } from "@/lib/zod-schemas/waiting";
+import { isDomainError } from "@/domain/errors/domain-error";
 import { waitingEntryService } from "@/domain/services/waiting-entry.service";
 
 export async function POST(request: Request) {
@@ -26,6 +27,16 @@ export async function POST(request: Request) {
         position: result.position,
       });
     } catch (error) {
+      if (isDomainError(error)) {
+        return fail(
+          {
+            code: error.code,
+            message: error.message,
+          },
+          409,
+        );
+      }
+
       return fail(
         {
           code: "JOIN_WAITING_FAILED",

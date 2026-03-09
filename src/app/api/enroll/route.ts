@@ -2,6 +2,7 @@
 import { parseBody } from "@/lib/http";
 import { requireApiRole } from "@/lib/route-guards";
 import { enrollSchema } from "@/lib/zod-schemas/student";
+import { isDomainError } from "@/domain/errors/domain-error";
 import { enrollmentService } from "@/domain/services/enrollment.service";
 import { prisma } from "@/lib/prisma";
 import { waitingRoomService } from "@/domain/services/waiting-room.service";
@@ -26,6 +27,16 @@ export async function POST(request: Request) {
     const enrollment = await enrollmentService.directEnroll(auth.user.id, body.sectionId);
     return ok({ enrollment });
   } catch (error) {
+    if (isDomainError(error)) {
+      return fail(
+        {
+          code: error.code,
+          message: error.message,
+        },
+        409,
+      );
+    }
+
     return fail(
       {
         code: "ENROLL_FAILED",

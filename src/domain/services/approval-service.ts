@@ -251,10 +251,16 @@ export const approvalService = {
         sectionReleaseMap.set(entry.offerSectionId, (sectionReleaseMap.get(entry.offerSectionId) ?? 0) + 1);
       }
       for (const [sectionId, count] of sectionReleaseMap.entries()) {
+        const currentSection = await tx.section.findUnique({
+          where: { id: sectionId },
+          select: { reservedCount: true },
+        });
+        if (!currentSection || currentSection.reservedCount <= 0) continue;
+
         await tx.section.update({
           where: { id: sectionId },
           data: {
-            reservedCount: { decrement: count },
+            reservedCount: { decrement: Math.min(count, currentSection.reservedCount) },
           },
         });
       }
@@ -428,8 +434,13 @@ export const approvalService = {
       });
 
       if (target.offerSectionId) {
-        await tx.section.update({
-          where: { id: target.offerSectionId },
+        await tx.section.updateMany({
+          where: {
+            id: target.offerSectionId,
+            reservedCount: {
+              gt: 0,
+            },
+          },
           data: {
             reservedCount: { decrement: 1 },
           },
@@ -510,8 +521,7 @@ export const approvalService = {
 
     for (const approval of overdueApprovals) {
       const sections = approval.waitingRoom.course.sections.filter((s) => s.status === "OPEN");
-      const canAutoApprove =
-        sections.some((s) => hasAvailableSlot(s.capacity, s.registeredCount, s.reservedCount)) || sections.length > 0;
+      const canAutoApprove = sections.some((s) => hasAvailableSlot(s.capacity, s.registeredCount, s.reservedCount));
 
       if (canAutoApprove) {
         await prisma.approval.update({
@@ -578,10 +588,16 @@ export const approvalService = {
             sectionReleaseMap.set(entry.offerSectionId, (sectionReleaseMap.get(entry.offerSectionId) ?? 0) + 1);
           }
           for (const [sectionId, count] of sectionReleaseMap.entries()) {
+            const currentSection = await tx.section.findUnique({
+              where: { id: sectionId },
+              select: { reservedCount: true },
+            });
+            if (!currentSection || currentSection.reservedCount <= 0) continue;
+
             await tx.section.update({
               where: { id: sectionId },
               data: {
-                reservedCount: { decrement: count },
+                reservedCount: { decrement: Math.min(count, currentSection.reservedCount) },
               },
             });
           }
