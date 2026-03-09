@@ -10,7 +10,7 @@ export default async function StudentWaitingPage() {
     <PageTransition>
       <Card className="glass-card border-cyan-200/80">
         <CardHeader>
-          <CardTitle>Lịch sử đăng ký học phần (trực tiếp + phòng chờ)</CardTitle>
+          <CardTitle>Lịch sử đăng ký học phần</CardTitle>
         </CardHeader>
         <CardContent>
           <WaitingHistory />

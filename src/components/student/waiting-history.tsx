@@ -162,10 +162,10 @@ export const WaitingHistory = () => {
       current.map((item) =>
         item.id === waitingEntryId
           ? {
-              ...item,
-              state: optimisticState,
-              reason: type === "confirm" ? "Đã xác nhận (đang đồng bộ...)" : "Đã từ chối (đang đồng bộ...)",
-            }
+            ...item,
+            state: optimisticState,
+            reason: type === "confirm" ? "Đã xác nhận (đang đồng bộ...)" : "Đã từ chối (đang đồng bộ...)",
+          }
           : item,
       ),
     );
@@ -290,7 +290,7 @@ export const WaitingHistory = () => {
     <div className="space-y-6">
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-base font-semibold">Môn đã đăng ký (trực tiếp + phòng chờ)</h3>
+          <h3 className="text-base font-semibold">Môn đã đăng ký</h3>
           <Badge variant="outline">{enrollments.length} môn</Badge>
         </div>
         {enrollments.length === 0 ? (

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Info, Loader2, Search, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { dayOfWeekLabel, formatSectionScheduleSummary } from "@/lib/section-display";
+import { formatSectionScheduleSummary } from "@/lib/section-display";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -320,14 +320,14 @@ export const SectionsTable = ({
           }
         }}
       >
-        <DialogContent className="overflow-hidden bg-white p-0 sm:max-w-[700px]">
-          <DialogHeader className="border-b bg-gray-50/50 p-6">
+        <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden bg-white p-0 sm:max-w-[900px]">
+          <DialogHeader className="shrink-0 border-b bg-gray-50/50 p-6">
             <DialogTitle className="text-xl text-[#0f3b46]">Phòng chờ đăng ký học phần</DialogTitle>
             <DialogDescription>
               Hệ thống sẽ xét theo FIFO và ưu tiên nguyện vọng từ lớp bổ sung do phòng đào tạo mở cho phòng chờ.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_1fr]">
+          <div className="flex-1 space-y-6 overflow-y-auto p-6">
             <div className="space-y-4">
               {[
                 { label: "Ưu tiên 1:", value: priority1, onChange: setPriority1 },
@@ -341,14 +341,14 @@ export const SectionsTable = ({
                     onValueChange={(value) => priority.onChange(value === NONE_PRIORITY ? "" : value)}
                     disabled={!canJoinWaiting}
                   >
-                    <SelectTrigger className="bg-white">
+                    <SelectTrigger className="!w-full min-w-0 overflow-hidden bg-white *:data-[slot=select-value]:truncate *:data-[slot=select-value]:block">
                       <SelectValue placeholder="Không chọn" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-w-[calc(var(--radix-select-trigger-width))] min-w-[var(--radix-select-trigger-width)]">
                       <SelectItem value={NONE_PRIORITY}>Không chọn</SelectItem>
                       {selectableWaitingSections.map((section) => (
-                        <SelectItem key={section.id} value={section.id}>
-                          {dayOfWeekLabel(section.dayOfWeek)} {section.timeSlot.startTime} - {section.timeSlot.endTime}
+                        <SelectItem key={section.id} value={section.id} className="whitespace-normal">
+                          {getScheduleSummary(section)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -356,7 +356,7 @@ export const SectionsTable = ({
                 </div>
               ))}
             </div>
-            <div className="flex flex-col justify-center rounded-lg border bg-slate-50 p-5">
+            <div className="rounded-lg border bg-slate-50 p-5">
               <div className="mb-3 flex items-center gap-2 text-[#0f3b46]">
                 <ShieldCheck className="size-5" />
                 <h4 className="font-bold">Cam kết</h4>
@@ -372,7 +372,7 @@ export const SectionsTable = ({
               </label>
             </div>
           </div>
-          <DialogFooter className="flex justify-end gap-2 border-t bg-gray-50 p-4">
+          <DialogFooter className="shrink-0 flex justify-end gap-2 border-t bg-gray-50 p-4">
             <Button
               className="min-w-[160px] bg-[#0f3b46] text-white hover:bg-[#0f3b46]/90"
               onClick={joinWaiting}

@@ -253,6 +253,11 @@ export const enrollmentService = {
         },
       });
 
+      const waitingRoom = await tx.waitingRoom.findUnique({
+        where: { courseId: enrollment.section.courseId },
+        select: { id: true, isActive: true },
+      });
+
       return {
         enrollmentId: enrollment.id,
         sectionId: enrollment.sectionId,
@@ -263,6 +268,7 @@ export const enrollmentService = {
         sectionCode: enrollment.section.code,
         courseCode: enrollment.section.course.code,
         courseName: enrollment.section.course.name,
+        courseWaitingRoomId: waitingRoom?.isActive ? waitingRoom.id : null,
       };
     });
 
@@ -299,6 +305,12 @@ export const enrollmentService = {
         warningNextSemester: result.warningNextSemester,
       }),
     ]);
+
+    if (result.courseWaitingRoomId) {
+      void matchingService.matchWaitingRoom(result.courseWaitingRoomId).catch((error) => {
+        console.error("Lỗi khi tự động dò tìm phòng chờ sau khi hủy học phần:", error);
+      });
+    }
 
     return {
       enrollmentId: result.enrollmentId,
