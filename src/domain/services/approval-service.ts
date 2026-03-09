@@ -319,13 +319,13 @@ export const approvalService = {
       });
 
       if (!target) {
-        throw new Error("Khong tim thay waiting entry");
+        throw new Error("Không tìm thấy đề xuất phòng chờ");
       }
       if (target.state !== WaitingEntryState.PENDING_ADMIN) {
-        throw new Error("Chi co the duyet entry dang cho admin");
+        throw new Error("Chỉ có thể duyệt đề xuất đang chờ admin");
       }
       if (!target.offerSectionId) {
-        throw new Error("Entry chua co lop de xep");
+        throw new Error("Đề xuất chưa có lớp để xếp");
       }
 
       return tx.waitingEntry.update({
@@ -412,10 +412,10 @@ export const approvalService = {
       });
 
       if (!target) {
-        throw new Error("Khong tim thay waiting entry");
+        throw new Error("Không tìm thấy đề xuất phòng chờ");
       }
       if (target.state !== WaitingEntryState.PENDING_ADMIN) {
-        throw new Error("Chi co the tu choi entry dang cho admin");
+        throw new Error("Chỉ có thể từ chối đề xuất đang chờ admin");
       }
 
       const updated = await tx.waitingEntry.update({

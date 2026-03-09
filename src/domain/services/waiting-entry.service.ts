@@ -66,12 +66,12 @@ export const waitingEntryService = {
     ]);
 
     if (!studentProfile?.faculty || !course || course.faculty !== studentProfile.faculty) {
-      throw new Error("Ban chi co the tham gia phong cho cua hoc phan thuoc nganh cua minh");
+      throw new Error("Bạn chỉ có thể tham gia phòng chờ của học phần thuộc ngành của mình");
     }
 
     if (isFutureDate(studentProfile.waitingRoomBlockedUntil)) {
       throw new Error(
-        `Ban dang bi tam khoa quyen tham gia phong cho den ${studentProfile.waitingRoomBlockedUntil?.toLocaleString(
+        `Bạn đang bị tạm khóa quyền tham gia phòng chờ đến ${studentProfile.waitingRoomBlockedUntil?.toLocaleString(
           "vi-VN",
         )}`,
       );
@@ -79,10 +79,10 @@ export const waitingEntryService = {
 
     const room = await waitingRoomService.evaluateAndActivate(courseId);
     if (!room) {
-      throw new Error("Khong tim thay phong cho cho hoc phan");
+      throw new Error("Không tìm thấy phòng chờ cho học phần");
     }
     if (!room.isActive) {
-      throw new Error("Phong cho chua du dieu kien kich hoat");
+      throw new Error("Phòng chờ chưa đủ điều kiện kích hoạt");
     }
 
     const priorityIds = priorities.map((item) => item.sectionId);
@@ -96,10 +96,10 @@ export const waitingEntryService = {
       select: { id: true },
     });
     if (!waitingSections.length) {
-      throw new Error("Chua co lop bo sung kha dung cho phong cho");
+      throw new Error("Chưa có lớp bổ sung khả dụng cho phòng chờ");
     }
     if (waitingSections.length !== priorityIds.length) {
-      throw new Error("Nguyen vong phai la cac lop bo sung danh cho phong cho");
+      throw new Error("Nguyện vọng phải là các lớp bổ sung dành cho phòng chờ");
     }
 
     const existing = await prisma.waitingEntry.findFirst({
@@ -112,12 +112,12 @@ export const waitingEntryService = {
       },
     });
     if (existing) {
-      throw new Error("Ban da co yeu cau dang cho xu ly");
+      throw new Error("Bạn đã có yêu cầu đang chờ xử lý");
     }
 
     const priorityPenaltyActive = isFutureDate(studentProfile.priorityPenaltyUntil);
     if (priorityPenaltyActive && priorities.length < 2) {
-      throw new Error("Ban dang mat quyen uu tien tam thoi, vui long chon it nhat 2 nguyen vong");
+      throw new Error("Bạn đang mất quyền ưu tiên tạm thời, vui lòng chọn ít nhất 2 nguyện vọng");
     }
     const entry = await prisma.waitingEntry.create({
       data: {
