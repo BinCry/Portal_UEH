@@ -433,7 +433,6 @@ export const enrollmentService = {
 
     const matchedPriority = entry.matchedPriority ?? 3;
     const isPriorityOneDecline = matchedPriority === 1;
-    const blockedUntil = isPriorityOneDecline ? addDaysFromNow(WAITING_BLOCK_NEXT_SEMESTER_DAYS) : null;
     const priorityPenaltyUntil = !isPriorityOneDecline ? addDaysFromNow(WAITING_PRIORITY_PENALTY_DAYS) : null;
 
     await prisma.$transaction(async (tx) => {
@@ -455,14 +454,7 @@ export const enrollmentService = {
         });
       }
 
-      if (isPriorityOneDecline && blockedUntil) {
-        await tx.studentProfile.update({
-          where: { userId: studentId },
-          data: {
-            waitingRoomBlockedUntil: blockedUntil,
-          },
-        });
-      } else if (priorityPenaltyUntil) {
+      if (priorityPenaltyUntil) {
         await tx.studentProfile.update({
           where: { userId: studentId },
           data: {
@@ -478,18 +470,17 @@ export const enrollmentService = {
           ? "Cảnh báo: bạn đã từ chối đề xuất ưu tiên 1"
           : "Bạn đã từ chối đề xuất ưu tiên 2/3",
         message: isPriorityOneDecline
-          ? `Bạn sẽ bị khóa quyền tham gia phòng chờ đến ${blockedUntil?.toLocaleString("vi-VN")}.`
+          ? "Đây là cảnh báo hệ thống: Việc từ chối đề xuất ưu tiên 1 có thể ảnh hưởng đến kết quả đăng ký của bạn sau này."
           : `Bạn bị mất quyền ưu tiên tạm thời đến ${priorityPenaltyUntil?.toLocaleString("vi-VN")}.`,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
         matchedPriority,
-        waitingRoomBlockedUntil: blockedUntil?.toISOString() ?? null,
         priorityPenaltyUntil: priorityPenaltyUntil?.toISOString() ?? null,
       }),
       notificationService.createForAdmins("SYSTEM", {
         title: "Sinh viên từ chối offer phòng chờ",
         message: isPriorityOneDecline
-          ? `Sinh viên vừa từ chối đề xuất ưu tiên 1 của học phần ${entry.waitingRoom.course.code}. Đã khóa quyền phòng chờ học kỳ kế tiếp.`
+          ? `Sinh viên vừa từ chối đề xuất ưu tiên 1 của học phần ${entry.waitingRoom.course.code}. Đã ghi nhận cảnh báo vi phạm.`
           : `Sinh viên vừa từ chối đề xuất ưu tiên ${matchedPriority} của học phần ${entry.waitingRoom.course.code}. Đã áp dụng mất quyền ưu tiên tạm thời.`,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
@@ -497,7 +488,6 @@ export const enrollmentService = {
         courseCode: entry.waitingRoom.course.code,
         courseName: entry.waitingRoom.course.name,
         matchedPriority,
-        waitingRoomBlockedUntil: blockedUntil?.toISOString() ?? null,
         priorityPenaltyUntil: priorityPenaltyUntil?.toISOString() ?? null,
       }),
     ]);

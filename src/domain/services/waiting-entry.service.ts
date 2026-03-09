@@ -69,13 +69,7 @@ export const waitingEntryService = {
       throw new Error("Bạn chỉ có thể tham gia phòng chờ của học phần thuộc ngành của mình");
     }
 
-    if (isFutureDate(studentProfile.waitingRoomBlockedUntil)) {
-      throw new Error(
-        `Bạn đang bị tạm khóa quyền tham gia phòng chờ đến ${studentProfile.waitingRoomBlockedUntil?.toLocaleString(
-          "vi-VN",
-        )}`,
-      );
-    }
+    // Penalty block requirement removed as per user request
 
     const room = await waitingRoomService.evaluateAndActivate(courseId);
     if (!room) {
