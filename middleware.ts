@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
+import NextAuth from "next-auth";
 
 const studentPaths = ["/student"];
 const adminPaths = ["/admin"];
