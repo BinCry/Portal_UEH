@@ -99,6 +99,14 @@ export const SectionsTable = ({
     return nonFullSections.length ? nonFullSections : waitingSections;
   }, [waitingSections]);
   const canJoinWaiting = waitingActive && waitingSections.length > 0;
+  const priority2Options = useMemo(
+    () => selectableWaitingSections.filter((section) => section.id !== priority1),
+    [selectableWaitingSections, priority1],
+  );
+  const priority3Options = useMemo(
+    () => selectableWaitingSections.filter((section) => section.id !== priority1 && section.id !== priority2),
+    [selectableWaitingSections, priority1, priority2],
+  );
 
   const filteredSections = useMemo(() => {
     return sections.filter((section) => {
@@ -112,6 +120,23 @@ export const SectionsTable = ({
   const selectedSectionData = sections.find((section) => section.id === selectedSectionId);
   const isSelectedAvailable =
     selectedSectionData?.studentStatus === "AVAILABLE" || selectedSectionData?.studentStatus === "NEAR_FULL";
+
+  const handlePriority1Change = (nextValue: string) => {
+    setPriority1(nextValue);
+    if (nextValue && nextValue === priority2) {
+      setPriority2("");
+    }
+    if (nextValue && nextValue === priority3) {
+      setPriority3("");
+    }
+  };
+
+  const handlePriority2Change = (nextValue: string) => {
+    setPriority2(nextValue);
+    if (nextValue && nextValue === priority3) {
+      setPriority3("");
+    }
+  };
 
   const handleEnroll = async () => {
     if (!selectedSectionId) {
@@ -330,9 +355,24 @@ export const SectionsTable = ({
           <div className="flex-1 space-y-6 overflow-y-auto p-6">
             <div className="space-y-4">
               {[
-                { label: "Ưu tiên 1:", value: priority1, onChange: setPriority1 },
-                { label: "Ưu tiên 2:", value: priority2, onChange: setPriority2 },
-                { label: "Ưu tiên 3:", value: priority3, onChange: setPriority3 },
+                {
+                  label: "Ưu tiên 1:",
+                  value: priority1,
+                  onChange: handlePriority1Change,
+                  options: selectableWaitingSections,
+                },
+                {
+                  label: "Ưu tiên 2:",
+                  value: priority2,
+                  onChange: handlePriority2Change,
+                  options: priority2Options,
+                },
+                {
+                  label: "Ưu tiên 3:",
+                  value: priority3,
+                  onChange: setPriority3,
+                  options: priority3Options,
+                },
               ].map((priority) => (
                 <div key={priority.label} className="space-y-2">
                   <Label className="font-semibold text-gray-700">{priority.label}</Label>
@@ -346,7 +386,7 @@ export const SectionsTable = ({
                     </SelectTrigger>
                     <SelectContent className="max-w-[calc(var(--radix-select-trigger-width))] min-w-[var(--radix-select-trigger-width)]">
                       <SelectItem value={NONE_PRIORITY}>Không chọn</SelectItem>
-                      {selectableWaitingSections.map((section) => (
+                      {priority.options.map((section) => (
                         <SelectItem key={section.id} value={section.id} className="whitespace-normal">
                           {getScheduleSummary(section)}
                         </SelectItem>
