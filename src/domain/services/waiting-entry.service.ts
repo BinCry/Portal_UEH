@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { now } from "@/lib/time";
 import { notificationService } from "@/domain/services/notification.service";
 import { waitingRoomService } from "@/domain/services/waiting-room.service";
+import { matchingService } from "@/domain/services/matching.service";
 
 type PriorityInput = {
   sectionId: string;
@@ -156,6 +157,9 @@ export const waitingEntryService = {
         priorityPenaltyUntil: studentProfile.priorityPenaltyUntil?.toISOString() ?? null,
       }),
     ]);
+
+    // Asynchronously trigger matching so students joining an already approved room don't get stuck in QUEUED
+    void matchingService.matchWaitingRoom(room.id).catch(console.error);
 
     return { room, entry, position };
   },
