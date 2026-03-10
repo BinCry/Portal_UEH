@@ -2,14 +2,32 @@ import { EnrollmentStatus, FinanceStatus, Prisma } from "@prisma/client";
 import { TUITION_PER_CREDIT } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
+type FinanceMutationClient = Prisma.TransactionClient | typeof prisma;
+
+type EnsureEnrollmentLedgerArgs = {
+  client?: FinanceMutationClient;
+  studentId: string;
+  sectionId: string;
+  courseId?: string;
+  amount?: Prisma.Decimal | number;
+};
+
+export const ACTIVE_FINANCE_STATUSES: FinanceStatus[] = [FinanceStatus.PENDING, FinanceStatus.POSTED];
+
 export const financeService = {
-  async createEnrollmentLedger(studentId: string, sectionId: string) {
-    const existing = await prisma.financeLedger.findFirst({
+  async ensureEnrollmentLedger({
+    client = prisma,
+    studentId,
+    sectionId,
+    courseId,
+    amount,
+  }: EnsureEnrollmentLedgerArgs) {
+    const existing = await client.financeLedger.findFirst({
       where: {
         studentId,
         sectionId,
         status: {
-          in: [FinanceStatus.PENDING, FinanceStatus.POSTED],
+          in: ACTIVE_FINANCE_STATUSES,
         },
       },
       orderBy: { createdAt: "desc" },
@@ -18,20 +36,50 @@ export const financeService = {
       return existing;
     }
 
-    const section = await prisma.section.findUnique({
-      where: { id: sectionId },
-      include: { course: true },
-    });
-    if (!section) throw new Error("Section not found");
+    let resolvedCourseId = courseId;
+    let resolvedAmount = amount ? new Prisma.Decimal(amount) : null;
 
-    const amount = section.course.credits * TUITION_PER_CREDIT;
-    return prisma.financeLedger.create({
+    if (!resolvedCourseId || !resolvedAmount) {
+      const section = await client.section.findUnique({
+        where: { id: sectionId },
+        include: { course: true },
+      });
+      if (!section) throw new Error("Section not found");
+
+      resolvedCourseId ??= section.courseId;
+      resolvedAmount ??= new Prisma.Decimal(section.course.credits * TUITION_PER_CREDIT);
+    }
+
+    return client.financeLedger.create({
       data: {
         studentId,
         sectionId,
-        courseId: section.courseId,
-        amount,
+        courseId: resolvedCourseId,
+        amount: resolvedAmount,
         status: FinanceStatus.POSTED,
+      },
+    });
+  },
+
+  async voidEnrollmentLedgers({
+    client = prisma,
+    studentId,
+    sectionId,
+  }: {
+    client?: FinanceMutationClient;
+    studentId: string;
+    sectionId: string;
+  }) {
+    return client.financeLedger.updateMany({
+      where: {
+        studentId,
+        sectionId,
+        status: {
+          in: ACTIVE_FINANCE_STATUSES,
+        },
+      },
+      data: {
+        status: FinanceStatus.VOID,
       },
     });
   },
@@ -67,7 +115,7 @@ export const financeService = {
     ]);
 
     const activeSectionIds = new Set(activeEnrollments.map((item) => item.sectionId));
-    return rows.filter((row) => !row.sectionId || activeSectionIds.has(row.sectionId));
+    return rows.filter((row) => Boolean(row.sectionId && row.section && activeSectionIds.has(row.sectionId)));
   },
 
   async getValidPostedTotal(studentId: string) {

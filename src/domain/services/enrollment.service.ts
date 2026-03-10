@@ -1,6 +1,5 @@
-﻿import { EnrollmentStatus, FinanceStatus, NotificationType, Prisma, WaitingEntryState } from "@prisma/client";
+import { EnrollmentStatus, NotificationType, Prisma, WaitingEntryState } from "@prisma/client";
 import {
-  TUITION_PER_CREDIT,
   WAITING_PRIORITY_PENALTY_DAYS,
 } from "@/lib/constants";
 import { DomainError } from "@/domain/errors/domain-error";
@@ -8,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { addDaysFromNow, isExpired, now } from "@/lib/time";
 import { hasScheduleConflict } from "@/domain/policies/schedule";
 import { assertNoActiveEnrollmentForCourse } from "@/domain/services/enrollment-guard.service";
+import { financeService } from "@/domain/services/finance.service";
 import { matchingService } from "@/domain/services/matching.service";
 import { notificationService } from "@/domain/services/notification.service";
 
@@ -22,7 +22,7 @@ export const enrollmentService = {
         select: { faculty: true },
       });
       if (!studentProfile?.faculty) {
-        throw new Error("Báº¡n chÆ°a Ä‘Æ°á»£c gÃ¡n ngÃ nh/chÆ°Æ¡ng trÃ¬nh Ä‘Ã o táº¡o");
+        throw new Error("Bạn chưa được gán ngành/chương trình đào tạo");
       }
 
       const section = await tx.section.findUnique({
@@ -33,16 +33,16 @@ export const enrollmentService = {
         },
       });
       if (!section || section.status !== "OPEN") {
-        throw new Error("Lá»›p há»c pháº§n khÃ´ng kháº£ dá»¥ng");
+        throw new Error("Lớp học phần không khả dụng");
       }
       if (section.isWaitingOption) {
-        throw new Error("Lá»›p nÃ y chá»‰ dÃ¹ng cho phÃ²ng chá»");
+        throw new Error("Lớp này chỉ dùng cho phòng chờ");
       }
       if (section.course.faculty !== studentProfile.faculty) {
-        throw new Error("Báº¡n chá»‰ Ä‘Æ°á»£c Ä‘Äƒng kÃ½ há»c pháº§n thuá»™c ngÃ nh cá»§a mÃ¬nh");
+        throw new Error("Bạn chỉ được đăng ký học phần thuộc ngành của mình");
       }
       if (availableSlots(section.capacity, section.registeredCount, section.reservedCount) <= 0) {
-        throw new Error("Lá»›p há»c pháº§n Ä‘Ã£ Ä‘áº§y");
+        throw new Error("Lớp học phần đã đầy");
       }
 
       const existingBySection = await tx.enrollment.findUnique({
@@ -75,7 +75,7 @@ export const enrollmentService = {
         },
       });
       if (hasScheduleConflict(section, existing.map((x) => x.section))) {
-        throw new Error("TrÃ¹ng lá»‹ch há»c");
+        throw new Error("Trùng lịch học");
       }
 
       await assertNoActiveEnrollmentForCourse({
@@ -112,7 +112,7 @@ export const enrollmentService = {
           if (latest?.status === EnrollmentStatus.ENROLLED) {
             throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Ban da dang ky hoc phan nay");
           }
-          throw new Error("Há»c pháº§n Ä‘ang Ä‘Æ°á»£c xá»­ lÃ½, vui lÃ²ng thá»­ láº¡i");
+          throw new Error("Học phần đang được xử lý, vui lòng thử lại");
         }
 
         enrollment = await tx.enrollment.findUnique({
@@ -142,7 +142,7 @@ export const enrollmentService = {
       }
 
       if (!enrollment) {
-        throw new Error("KhÃ´ng thá»ƒ táº¡o Ä‘Äƒng kÃ½ há»c pháº§n");
+        throw new Error("Không thể tạo đăng ký học phần");
       }
 
       await tx.section.update({
@@ -150,27 +150,11 @@ export const enrollmentService = {
         data: { registeredCount: { increment: 1 } },
       });
 
-      const existingLedger = await tx.financeLedger.findFirst({
-        where: {
-          studentId,
-          sectionId,
-          status: {
-            in: [FinanceStatus.PENDING, FinanceStatus.POSTED],
-          },
-        },
-        orderBy: { createdAt: "desc" },
+      await financeService.ensureEnrollmentLedger({
+        client: tx,
+        studentId,
+        sectionId,
       });
-      if (!existingLedger) {
-        await tx.financeLedger.create({
-          data: {
-            studentId,
-            courseId: section.courseId,
-            sectionId,
-            amount: section.course.credits * TUITION_PER_CREDIT,
-            status: FinanceStatus.POSTED,
-          },
-        });
-      }
 
       return enrollment;
     });
@@ -198,10 +182,10 @@ export const enrollmentService = {
       });
 
       if (!enrollment) {
-        throw new Error("KhÃ´ng tÃ¬m tháº¥y há»c pháº§n Ä‘Ã£ Ä‘Äƒng kÃ½");
+        throw new Error("Không tìm thấy học phần đã đăng ký");
       }
       if (enrollment.status !== EnrollmentStatus.ENROLLED) {
-        throw new Error("Há»c pháº§n nÃ y Ä‘Ã£ Ä‘Æ°á»£c há»§y trÆ°á»›c Ä‘Ã³");
+        throw new Error("Học phần này đã được hủy trước đó");
       }
 
       const confirmedWaitingEntry = await tx.waitingEntry.findFirst({
@@ -229,7 +213,7 @@ export const enrollmentService = {
         },
       });
       if (!updatedEnrollment.count) {
-        throw new Error("Há»c pháº§n nÃ y Ä‘Ã£ Ä‘Æ°á»£c xá»­ lÃ½ trÆ°á»›c Ä‘Ã³");
+        throw new Error("Học phần này đã được xử lý trước đó");
       }
 
       const updatedSection = await tx.section.updateMany({
@@ -246,20 +230,13 @@ export const enrollmentService = {
         },
       });
       if (!updatedSection.count) {
-        throw new Error("KhÃ´ng thá»ƒ cáº­p nháº­t sÄ© sá»‘ lá»›p há»c pháº§n");
+        throw new Error("Không thể cập nhật sĩ số lớp học phần");
       }
 
-      await tx.financeLedger.updateMany({
-        where: {
-          studentId,
-          sectionId: enrollment.sectionId,
-          status: {
-            in: [FinanceStatus.PENDING, FinanceStatus.POSTED],
-          },
-        },
-        data: {
-          status: FinanceStatus.VOID,
-        },
+      await financeService.voidEnrollmentLedgers({
+        client: tx,
+        studentId,
+        sectionId: enrollment.sectionId,
       });
 
       const waitingRoom = await tx.waitingRoom.findUnique({
@@ -283,11 +260,11 @@ export const enrollmentService = {
 
     await Promise.all([
       notificationService.create(studentId, NotificationType.SYSTEM, {
-        title: "ÄÃ£ há»§y há»c pháº§n",
+        title: "Đã hủy học phần",
         message:
           result.source === "WAITING_ROOM"
-            ? `Báº¡n Ä‘Ã£ há»§y há»c pháº§n ${result.courseCode}. Vui lÃ²ng cÃ¢n nháº¯c trÃ¡ch nhiá»‡m vá»›i lá»±a chá»n phÃ²ng chá» á»Ÿ ká»³ sau.`
-            : `Báº¡n Ä‘Ã£ há»§y há»c pháº§n ${result.courseCode} thÃ nh cÃ´ng.`,
+            ? `Bạn đã hủy học phần ${result.courseCode}. Vui lòng cân nhắc trách nhiệm với lựa chọn phòng chờ ở kỳ sau.`
+            : `Bạn đã hủy học phần ${result.courseCode} thành công.`,
         enrollmentId: result.enrollmentId,
         sectionId: result.sectionId,
         sectionCode: result.sectionCode,
@@ -297,11 +274,11 @@ export const enrollmentService = {
         warningNextSemester: result.warningNextSemester,
       }),
       notificationService.createForAdmins(NotificationType.SYSTEM, {
-        title: "Sinh viÃªn Ä‘Ã£ há»§y há»c pháº§n",
+        title: "Sinh viên đã hủy học phần",
         message:
           result.source === "WAITING_ROOM"
-            ? `Sinh viÃªn Ä‘Ã£ há»§y há»c pháº§n ${result.courseCode} (nguá»“n phÃ²ng chá»).`
-            : `Sinh viÃªn Ä‘Ã£ há»§y há»c pháº§n ${result.courseCode} (Ä‘Äƒng kÃ½ trá»±c tiáº¿p).`,
+            ? `Sinh viên đã hủy học phần ${result.courseCode} (nguồn phòng chờ).`
+            : `Sinh viên đã hủy học phần ${result.courseCode} (đăng ký trực tiếp).`,
         studentId,
         enrollmentId: result.enrollmentId,
         sectionId: result.sectionId,
@@ -317,7 +294,7 @@ export const enrollmentService = {
 
     if (result.courseWaitingRoomId) {
       void matchingService.matchWaitingRoom(result.courseWaitingRoomId).catch((error) => {
-        console.error("Lá»—i khi tá»± Ä‘á»™ng dÃ² tÃ¬m phÃ²ng chá» sau khi há»§y há»c pháº§n:", error);
+        console.error("Lỗi khi tự động dò tìm phòng chờ sau khi hủy học phần:", error);
       });
     }
 
@@ -425,27 +402,11 @@ export const enrollmentService = {
         throw error;
       }
 
-      const existingLedger = await tx.financeLedger.findFirst({
-        where: {
-          studentId,
-          sectionId: entry.offerSectionId,
-          status: {
-            in: [FinanceStatus.PENDING, FinanceStatus.POSTED],
-          },
-        },
-        orderBy: { createdAt: "desc" },
+      await financeService.ensureEnrollmentLedger({
+        client: tx,
+        studentId,
+        sectionId: entry.offerSectionId,
       });
-      if (!existingLedger) {
-        await tx.financeLedger.create({
-          data: {
-            studentId,
-            courseId: entry.waitingRoom.courseId,
-            sectionId: entry.offerSectionId,
-            amount: entry.offerSection.course.credits * TUITION_PER_CREDIT,
-            status: FinanceStatus.POSTED,
-          },
-        });
-      }
 
       return { enrollment, entry };
     });
@@ -654,6 +615,10 @@ export const enrollmentService = {
     return { expiredCount };
   },
 };
+
+
+
+
 
 
 

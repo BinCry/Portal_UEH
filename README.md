@@ -74,6 +74,7 @@ Các biến bắt buộc:
 ```powershell
 & "C:\Program Files\nodejs\npm.cmd" run lint
 & "C:\Program Files\nodejs\npm.cmd" run typecheck
+& "C:\Program Files\nodejs\npm.cmd" run validate:integrity
 & "C:\Program Files\nodejs\npm.cmd" run test:unit
 & "C:\Program Files\nodejs\npm.cmd" run test:integration
 & "C:\Program Files\nodejs\npm.cmd" run test:e2e
@@ -81,14 +82,28 @@ Các biến bắt buộc:
 
 `test:e2e` sẽ tự chạy `prisma:seed` trước khi mở Playwright để đảm bảo dữ liệu ổn định.
 
+Dry-run integrity audit:
+
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" run repair:integrity
+```
+
+Apply auto-repair for fixable registration/finance drift:
+
+```powershell
+& "C:\Program Files\nodejs\npm.cmd" run repair:integrity -- --apply
+```
+
 Nếu e2e báo thiếu browser:
 
 ```powershell
 & "C:\Program Files\nodejs\npx.cmd" playwright install chromium
 ```
-
 ## Deploy Vercel + Neon
-- Build command: `prisma migrate deploy && next build`
+
+- Production release command: `npm run release:prod`
+- Pre-release verification: `npm run release:verify`
+- Keep generic `npm run build` non-mutating. If preview deployments share the same DB, do not attach `prisma migrate deploy` to every preview build.
 - Set env vars ở Vercel giống `.env`.
 - Cron gọi:
   - `/api/jobs/sla-scan`

@@ -1,57 +1,56 @@
 import { expect, test } from "@playwright/test";
+import { createTestDbContext, makePrefix } from "../support/db-fixtures";
+import { login } from "./helpers/auth";
 
-const login = async (page: import("@playwright/test").Page, email: string, password: string) => {
-  await page.goto("/login");
-  await page.locator("#email").fill(email);
-  await page.locator("#password").fill(password);
-  await page.getByRole("button", { name: /Đăng nhập|Dang nhap/i }).click();
-  await page.waitForURL("**/student/dashboard");
-};
+test("waiting confirm creates finance row for the offered section", async ({ page }) => {
+  const ctx = createTestDbContext(makePrefix("pw-waiting-confirm"));
 
-test("login -> join waiting -> see position -> confirm offered", async ({ page }) => {
-  await login(page, "student8@ueh.edu.vn", "123456");
+  try {
+    const student = await ctx.createStudentAccount();
+    const course = await ctx.createCourse();
+    const room = await ctx.createRoom();
+    const timeSlot = await ctx.createTimeSlot();
+    const section = await ctx.createSection({
+      courseId: course.id,
+      roomId: room.id,
+      timeSlotId: timeSlot.id,
+      capacity: 5,
+      reservedCount: 1,
+      isWaitingOption: true,
+    });
+    const waitingRoom = await ctx.createWaitingRoom({
+      courseId: course.id,
+    });
 
-  const coursesRes = await page.request.get("/api/courses");
-  expect(coursesRes.ok()).toBeTruthy();
-  const coursesPayload = await coursesRes.json();
-  const waitingCourse =
-    coursesPayload.data.find((course: { waitingRoom: { isActive: boolean } | null }) => course.waitingRoom?.isActive) ??
-    coursesPayload.data[0];
-  expect(waitingCourse).toBeTruthy();
+    await ctx.createWaitingEntry({
+      waitingRoomId: waitingRoom.id,
+      studentId: student.id,
+      offerSectionId: section.id,
+      matchedPriority: 1,
+    });
 
-  const sectionsRes = await page.request.get(`/api/courses/${waitingCourse.id}/sections`);
-  expect(sectionsRes.ok()).toBeTruthy();
-  const sectionsPayload = await sectionsRes.json();
-  const priorities = sectionsPayload.data.waitingSections
-    .slice(0, 3)
-    .map((section: { id: string }) => ({ sectionId: section.id }));
-  expect(priorities.length).toBeGreaterThan(0);
+    await login(page, student.email);
+    await page.goto("/student/waiting");
 
-  const joinRes = await page.request.post("/api/waiting/join", {
-    data: {
-      courseId: waitingCourse.id,
-      acceptedTerms: true,
-      priorities,
-    },
-  });
-  const joinPayload = await joinRes.json();
-  let joinedSuccessfully = false;
-  if (joinRes.ok() && joinPayload.success) {
-    joinedSuccessfully = true;
-    const position = joinPayload.data.position as number;
-    expect(position).toBeGreaterThan(0);
-  } else {
-    expect(joinPayload.error?.message ?? "").toMatch(/đang chờ xử lý|phòng chờ|yêu cầu/i);
+    const actionRow = page
+      .locator("tbody tr")
+      .filter({ hasText: course.code })
+      .filter({ has: page.getByRole("button", { name: /Xác nhận|Xac nhan/i }) });
+    await expect(actionRow).toHaveCount(1);
+
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/api/waiting/confirm") && response.ok()),
+      actionRow.getByRole("button", { name: /Xác nhận|Xac nhan/i }).click(),
+    ]);
+
+    await page.goto("/student/finance");
+    const financeRow = page.locator("tbody tr").filter({ hasText: course.code });
+    await expect(financeRow).toHaveCount(1);
+    await expect(financeRow.getByText(section.code)).toBeVisible();
+
+    await page.goto("/student/dashboard");
+    await expect(page.getByText("1.350.000 VND").first()).toBeVisible();
+  } finally {
+    await ctx.cleanup();
   }
-
-  await page.goto("/student/waiting");
-  if (joinedSuccessfully) {
-    await expect(page.getByText(/#\d+/).first()).toBeVisible();
-  }
-
-  await login(page, "student1@ueh.edu.vn", "123456");
-  await page.goto("/student/waiting");
-  const confirmButton = page.getByRole("button", { name: /Xác nhận|Xac nhan/i }).first();
-  await expect(confirmButton).toBeVisible();
-  await confirmButton.click();
 });

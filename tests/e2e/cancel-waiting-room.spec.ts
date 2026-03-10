@@ -1,84 +1,89 @@
 import { expect, test } from "@playwright/test";
+import { EnrollmentStatus, FinanceStatus, WaitingEntryState } from "@prisma/client";
+import { createTestDbContext, makePrefix } from "../support/db-fixtures";
+import { login, loginAdmin } from "./helpers/auth";
 
 type AdminSectionRow = {
-    registeredCount: number;
-    course: {
-        code: string;
-    };
+  code: string;
+  registeredCount: number;
 };
 
-const login = async (page: import("@playwright/test").Page, email: string, password: string) => {
-    await page.goto("/login");
-    await page.getByPlaceholder(/email/i).fill(email);
-    await page.getByPlaceholder(/mật khẩu|mat khau/i).fill(password);
-    await page.getByRole("button", { name: /Đăng nhập|Dang nhap/i }).click();
-    await page.waitForURL("**/student/dashboard", { timeout: 10000 }).catch(() => { });
-};
+test("cancel waiting-confirmed enrollment removes finance row and drops admin registered count", async ({ browser, page }) => {
+  const ctx = createTestDbContext(makePrefix("pw-waiting-cancel"));
 
-const loginAdmin = async (page: import("@playwright/test").Page) => {
-    await page.goto("/login");
-    await page.getByPlaceholder(/email/i).fill("admin@ueh.edu.vn");
-    await page.getByPlaceholder(/mật khẩu|mat khau/i).fill("123456");
-    await page.getByRole("button", { name: /Đăng nhập|Dang nhap/i }).click();
-    await page.waitForURL("**/admin/dashboard", { timeout: 10000 }).catch(() => { });
-};
+  try {
+    const student = await ctx.createStudentAccount();
+    const course = await ctx.createCourse();
+    const room = await ctx.createRoom();
+    const timeSlot = await ctx.createTimeSlot();
+    const section = await ctx.createSection({
+      courseId: course.id,
+      roomId: room.id,
+      timeSlotId: timeSlot.id,
+      capacity: 5,
+      registeredCount: 1,
+      isWaitingOption: true,
+    });
+    const waitingRoom = await ctx.createWaitingRoom({
+      courseId: course.id,
+    });
 
-test("admin sections capacity drops when student cancels waiting room confirmed enrollment", async ({ browser, page }) => {
-    test.setTimeout(90000); // 90s timeout
+    await ctx.createWaitingEntry({
+      waitingRoomId: waitingRoom.id,
+      studentId: student.id,
+      state: WaitingEntryState.CONFIRMED,
+      offerSectionId: section.id,
+      matchedPriority: 1,
+      expiresAt: null,
+    });
+    await ctx.createEnrollment({
+      studentId: student.id,
+      courseId: course.id,
+      sectionId: section.id,
+      status: EnrollmentStatus.ENROLLED,
+    });
+    await ctx.createFinanceLedger({
+      studentId: student.id,
+      courseId: course.id,
+      sectionId: section.id,
+      amount: 1_350_000,
+      status: FinanceStatus.POSTED,
+    });
 
-    // NOTE: Seeding has been done externally by `npx tsx seed-test.ts`.
-    // ACT: Let the admin load sections and see capacity
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await loginAdmin(adminPage);
-    await adminPage.goto("/admin/sections");
 
-    const sectionsResBefore = await adminPage.request.get("/api/admin/sections");
-    const sectionsBefore = (await sectionsResBefore.json()).data;
+    const sectionsBefore = (await (await adminPage.request.get("/api/admin/sections")).json()).data as AdminSectionRow[];
+    const adminSectionBefore = sectionsBefore.find((item) => item.code === section.code);
+    expect(adminSectionBefore?.registeredCount).toBe(1);
 
-    // LOG IN AS STUDENT AND CANCEL
-    await login(page, "student2@ueh.edu.vn", "123456");
+    await login(page, student.email);
+    await page.goto("/student/finance");
+    const financeRowBefore = page.locator("tbody tr").filter({ hasText: course.code }).first();
+    await expect(financeRowBefore).toBeVisible();
+    await expect(financeRowBefore).toContainText(section.code);
 
+    await page.goto("/student/waiting");
+    const cancelRow = page
+      .locator("tbody tr")
+      .filter({ hasText: course.code })
+      .filter({ has: page.getByRole("button", { name: /Hủy học phần|Huy hoc phan/i }) });
+    await expect(cancelRow).toHaveCount(1);
+
+    await cancelRow.getByRole("button", { name: /Hủy học phần|Huy hoc phan/i }).click();
     await Promise.all([
-        page.waitForResponse("**/api/enrollments/me"),
-        page.goto("/student/waiting")
+      page.waitForResponse((response) => response.url().includes("/api/enrollments/cancel") && response.ok()),
+      page.getByRole("button", { name: /Xác nhận hủy|Xac nhan huy/i }).click(),
     ]);
 
-    await page.waitForTimeout(1000); // give react a second to render
+    await page.goto("/student/finance");
+    await expect(page.locator("tbody tr").filter({ hasText: course.code })).toHaveCount(0);
 
-    const cancelLink = page.locator('button:has-text("Hủy học phần")').first();
-    await cancelLink.waitFor({ state: "visible", timeout: 15000 });
-
-    // Get course code from the row
-    const row = cancelLink.locator("xpath=ancestor::tr").first();
-    const courseCode = await row.locator("td").first().innerText();
-
-    // Find the capacity text for the section. 
-    const sectionBefore = (sectionsBefore as AdminSectionRow[]).find(
-        (s) => courseCode.includes(s.course.code) || s.course.code.includes(courseCode.trim()),
-    );
-    expect(sectionBefore).toBeTruthy();
-    const initialRegisteredCount = sectionBefore!.registeredCount;
-    console.log(`Admin sees section (course: ${courseCode}) registeredCount Before:`, initialRegisteredCount);
-
-    await cancelLink.click();
-
-    const confirmCancelBtn = page.getByRole("button", { name: /Xác nhận hủy/i });
-    await expect(confirmCancelBtn).toBeVisible();
-    await confirmCancelBtn.click();
-    await expect(page.getByText(/Đã hủy/i)).toBeVisible();
-    console.log("Student successfully canceled enrollment via the UI.");
-
-    // Check Admin Again
-    const sectionsResAfter = await adminPage.request.get("/api/admin/sections");
-    const sectionsAfter = (await sectionsResAfter.json()).data;
-    const sectionAfter = (sectionsAfter as AdminSectionRow[]).find(
-        (s) => courseCode.includes(s.course.code) || s.course.code.includes(courseCode.trim()),
-    );
-    expect(sectionAfter).toBeTruthy();
-    const finalRegisteredCount = sectionAfter!.registeredCount;
-    console.log(`Admin sees section (course: ${courseCode}) registeredCount After:`, finalRegisteredCount);
-
-    // Assert it drops
-    expect(finalRegisteredCount).toEqual(initialRegisteredCount - 1);
+    const sectionsAfter = (await (await adminPage.request.get("/api/admin/sections")).json()).data as AdminSectionRow[];
+    const adminSectionAfter = sectionsAfter.find((item) => item.code === section.code);
+    expect(adminSectionAfter?.registeredCount).toBe(0);
+  } finally {
+    await ctx.cleanup();
+  }
 });
