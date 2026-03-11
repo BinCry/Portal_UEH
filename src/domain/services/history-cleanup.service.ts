@@ -17,8 +17,15 @@ export const historyCleanupService = {
     const retentionDays = Math.max(HISTORY_RETENTION_DAYS, 1);
     const cutoffDate = cutoffFromNow(retentionDays);
 
-    const [deletedWaitingEntries, deletedApprovals, deletedNotifications] = await prisma.$transaction([
-      prisma.waitingEntry.deleteMany({
+    const result = await prisma.$transaction(async (tx) => {
+      const latestApprovalRows = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT DISTINCT ON ("waitingRoomId") id
+        FROM "Approval"
+        ORDER BY "waitingRoomId", "updatedAt" DESC, "createdAt" DESC, id DESC
+      `;
+      const protectedApprovalIds = latestApprovalRows.map((row) => row.id);
+
+      const deletedWaitingEntries = await tx.waitingEntry.deleteMany({
         where: {
           state: {
             in: terminalWaitingStates,
@@ -27,8 +34,9 @@ export const historyCleanupService = {
             lte: cutoffDate,
           },
         },
-      }),
-      prisma.approval.deleteMany({
+      });
+
+      const deletedApprovals = await tx.approval.deleteMany({
         where: {
           status: {
             not: ApprovalStatus.PENDING,
@@ -36,23 +44,38 @@ export const historyCleanupService = {
           updatedAt: {
             lte: cutoffDate,
           },
+          waitingRoom: {
+            isActive: false,
+          },
+          id: protectedApprovalIds.length
+            ? {
+              notIn: protectedApprovalIds,
+            }
+            : undefined,
         },
-      }),
-      prisma.notification.deleteMany({
+      });
+
+      const deletedNotifications = await tx.notification.deleteMany({
         where: {
           createdAt: {
             lte: cutoffDate,
           },
         },
-      }),
-    ]);
+      });
+
+      return {
+        deletedWaitingEntries,
+        deletedApprovals,
+        deletedNotifications,
+      };
+    });
 
     return {
       retentionDays,
       cutoffDate: cutoffDate.toISOString(),
-      deletedWaitingEntries: deletedWaitingEntries.count,
-      deletedApprovals: deletedApprovals.count,
-      deletedNotifications: deletedNotifications.count,
+      deletedWaitingEntries: result.deletedWaitingEntries.count,
+      deletedApprovals: result.deletedApprovals.count,
+      deletedNotifications: result.deletedNotifications.count,
     };
   },
 };

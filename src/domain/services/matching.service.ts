@@ -1,8 +1,9 @@
-import { NotificationType, Prisma, WaitingEntryState } from "@prisma/client";
+import { ApprovalStatus, NotificationType, Prisma, WaitingEntryState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { now } from "@/lib/time";
 import { hasScheduleConflict } from "@/domain/policies/schedule";
 import { notificationService } from "@/domain/services/notification.service";
+import { deriveWaitingRoomOperationalStatus } from "@/domain/services/waiting-room-state.service";
 
 type PriorityOption = {
   sectionId: string;
@@ -56,6 +57,48 @@ export const matchingService = {
         };
       }
 
+      const [room, pendingApproval, latestApproval, approvalsCount] = await Promise.all([
+        tx.waitingRoom.findUnique({
+          where: { id: waitingRoomId },
+          select: {
+            id: true,
+            isActive: true,
+          },
+        }),
+        tx.approval.findFirst({
+          where: {
+            waitingRoomId,
+            status: ApprovalStatus.PENDING,
+          },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            status: true,
+            reason: true,
+            updatedAt: true,
+            dueAt: true,
+          },
+        }),
+        tx.approval.findFirst({
+          where: {
+            waitingRoomId,
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          select: {
+            id: true,
+            status: true,
+            reason: true,
+            updatedAt: true,
+            dueAt: true,
+          },
+        }),
+        tx.approval.count({
+          where: {
+            waitingRoomId,
+          },
+        }),
+      ]);
+
       const queue = await tx.waitingEntry.findMany({
         where: {
           waitingRoomId,
@@ -84,6 +127,25 @@ export const matchingService = {
           },
         },
       });
+
+      const roomStatus = deriveWaitingRoomOperationalStatus({
+        isActive: room?.isActive ?? false,
+        approvalsCount,
+        queuedCount: queue.length,
+        pendingAdminCount: 0,
+        offeredCount: 0,
+        latestApproval,
+        pendingApproval,
+      });
+
+      if (roomStatus !== "APPROVED_ACTIVE") {
+        return {
+          totalQueued: queue.length,
+          pendingAdmin: 0,
+          failed: 0,
+          notifications: [] as NotificationDraft[],
+        };
+      }
 
       let pendingAdmin = 0;
       let failed = 0;

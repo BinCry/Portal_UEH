@@ -91,30 +91,6 @@ const autoApprovePendingEntriesForRoom = async (waitingRoomId: string) => {
 export const approvalService = {
   async manualApprove(waitingRoomId: string, approvedById: string, reason?: string) {
     const { approval, room, entries } = await prisma.$transaction(async (tx) => {
-      const pending = await tx.approval.findFirst({
-        where: { waitingRoomId, status: ApprovalStatus.PENDING },
-        orderBy: { createdAt: "desc" },
-      });
-
-      const approval = pending
-        ? await tx.approval.update({
-          where: { id: pending.id },
-          data: {
-            status: ApprovalStatus.APPROVED,
-            approvedById,
-            reason: reason ?? "Phê duyệt thủ công",
-          },
-        })
-        : await tx.approval.create({
-          data: {
-            waitingRoomId,
-            status: ApprovalStatus.APPROVED,
-            approvedById,
-            reason: reason ?? "Phê duyệt thủ công",
-            dueAt: now(),
-          },
-        });
-
       const room = await tx.waitingRoom.findUnique({
         where: { id: waitingRoomId },
         include: {
@@ -123,6 +99,43 @@ export const approvalService = {
           },
         },
       });
+
+      if (!room) {
+        throw new Error("Khong tim thay phong cho");
+      }
+
+      const pending = await tx.approval.findFirst({
+        where: { waitingRoomId, status: ApprovalStatus.PENDING },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const latestApproval = await tx.approval.findFirst({
+        where: { waitingRoomId },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      });
+
+      const approval = pending
+        ? await tx.approval.update({
+          where: { id: pending.id },
+          data: {
+            status: ApprovalStatus.APPROVED,
+            approvedById,
+            reason: reason ?? "Phe duyet thu cong",
+          },
+        })
+        : latestApproval &&
+            room.isActive &&
+            (latestApproval.status === ApprovalStatus.APPROVED || latestApproval.status === ApprovalStatus.AUTO_APPROVED)
+          ? latestApproval
+          : await tx.approval.create({
+            data: {
+              waitingRoomId,
+              status: ApprovalStatus.APPROVED,
+              approvedById,
+              reason: reason ?? "Phe duyet thu cong",
+              dueAt: now(),
+            },
+          });
 
       const entries = await tx.waitingEntry.findMany({
         where: {
@@ -145,9 +158,9 @@ export const approvalService = {
         entries.map((entry) => entry.studentId),
         "SYSTEM",
         {
-          title: "Phòng chờ đã được phê duyệt",
+          title: "Phong cho da duoc phe duyet",
           message:
-            "Phòng đào tạo đã phê duyệt phòng chờ. Hệ thống đang map nguyện vọng và gửi từng đề xuất để admin duyệt cuối.",
+            "Phong dao tao da phe duyet phong cho. He thong dang map nguyen vong va gui tung de xuat de admin duyet cuoi.",
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -157,8 +170,8 @@ export const approvalService = {
       await notificationService.createForAdmins(
         "SYSTEM",
         {
-          title: "Đã phê duyệt phòng chờ",
-          message: `Phòng chờ học phần ${room.course.code} đã được phê duyệt.`,
+          title: "Da phe duyet phong cho",
+          message: `Phong cho hoc phan ${room.course.code} da duoc phe duyet.`,
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -171,8 +184,8 @@ export const approvalService = {
     const matchResult = await matchingService.matchWaitingRoom(waitingRoomId);
     if (room) {
       await notificationService.createForAdmins("SYSTEM", {
-        title: "Kết quả map hàng đợi",
-        message: `Học phần ${room.course.code}: ${matchResult.pendingAdmin} đề xuất đang chờ admin duyệt, ${matchResult.failed} không phân được.`,
+        title: "Ket qua map hang doi",
+        message: `Hoc phan ${room.course.code}: ${matchResult.pendingAdmin} de xuat dang cho admin duyet, ${matchResult.failed} khong phan duoc.`,
         waitingRoomId,
         courseCode: room.course.code,
         pendingAdmin: matchResult.pendingAdmin,

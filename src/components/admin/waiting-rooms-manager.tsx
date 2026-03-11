@@ -14,6 +14,12 @@ type WaitingRoom = {
   id: string;
   isActive: boolean;
   waitingCount: number;
+  queuedCount: number;
+  pendingAdminCount: number;
+  offeredCount: number;
+  roomStatus: "PENDING_REVIEW" | "APPROVED_ACTIVE" | "REJECTED_CLOSED" | "ORPHAN_ACTIVE";
+  hasPendingApproval: boolean;
+  isOrphanActive: boolean;
   course: {
     code: string;
     name: string;
@@ -45,16 +51,16 @@ type WaitingRoom = {
   }>;
 };
 
-const statusLabel: Record<NonNullable<WaitingRoom["latestApproval"]>["status"], string> = {
-  PENDING: "Đang chờ duyệt",
-  APPROVED: "Đã phê duyệt",
-  AUTO_APPROVED: "Tự động phê duyệt",
-  REJECTED: "Đã từ chối",
+const statusLabel: Record<WaitingRoom["roomStatus"], string> = {
+  PENDING_REVIEW: "Dang cho duyet",
+  APPROVED_ACTIVE: "Da duoc duyet",
+  REJECTED_CLOSED: "Da dong",
+  ORPHAN_ACTIVE: "Can khoi phuc duyet",
 };
 
-const statusBadgeVariant = (status: NonNullable<WaitingRoom["latestApproval"]>["status"]) => {
-  if (status === "APPROVED" || status === "AUTO_APPROVED") return "default";
-  if (status === "REJECTED") return "destructive";
+const statusBadgeVariant = (status: WaitingRoom["roomStatus"]) => {
+  if (status === "APPROVED_ACTIVE") return "default";
+  if (status === "REJECTED_CLOSED") return "destructive";
   return "secondary";
 };
 
@@ -189,8 +195,7 @@ export const WaitingRoomsManager = () => {
               {rooms.map((room) => {
                 const dueAt = room.pendingApproval?.dueAt ? new Date(room.pendingApproval.dueAt) : null;
                 const countdown = dueAt ? differenceInHours(dueAt, new Date()) : null;
-                const status = room.latestApproval?.status ?? "PENDING";
-                const hasPending = Boolean(room.pendingApproval);
+                const hasRoomAction = room.hasPendingApproval || room.isOrphanActive;
 
                 return (
                   <TableRow key={room.id}>
@@ -200,14 +205,24 @@ export const WaitingRoomsManager = () => {
                       </p>
                       <p className="text-muted-foreground text-xs">{room.isActive ? "Đang mở" : "Đã đóng"}</p>
                     </TableCell>
-                    <TableCell className="font-sans tabular-nums">{room.waitingCount}</TableCell>
                     <TableCell>
-                      <Badge variant={room.pendingEntries.length ? "default" : "secondary"}>{room.pendingEntries.length}</Badge>
+                      <p className="font-sans tabular-nums">{room.waitingCount}</p>
+                      <p className="text-muted-foreground text-xs">
+                        FIFO {room.queuedCount} | Admin {room.pendingAdminCount} | Offer {room.offeredCount}
+                      </p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusBadgeVariant(status)}>{statusLabel[status]}</Badge>
+                      <Badge variant={room.pendingAdminCount ? "default" : "secondary"}>{room.pendingAdminCount}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={statusBadgeVariant(room.roomStatus)}>{statusLabel[room.roomStatus]}</Badge>
                       {room.latestApproval?.reason ? (
                         <p className="text-muted-foreground mt-1 text-xs">{room.latestApproval.reason}</p>
+                      ) : null}
+                      {room.isOrphanActive ? (
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          Room dang mo nhung thieu approval history. Co the phe duyet lai de khoi phuc.
+                        </p>
                       ) : null}
                     </TableCell>
                     <TableCell>
@@ -218,15 +233,17 @@ export const WaitingRoomsManager = () => {
                             {countdown !== null ? `${countdown} giờ` : "--"}
                           </Badge>
                         </>
+                      ) : room.isOrphanActive ? (
+                        <span className="text-muted-foreground text-xs">Can khoi phuc approval anchor</span>
                       ) : (
                         <span className="text-muted-foreground text-xs">Không còn SLA chờ xử lý</span>
                       )}
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
-                      <Button className="primary-glow" disabled={!hasPending} onClick={() => void approveRoom(room.id)}>
+                      <Button className="primary-glow" disabled={!hasRoomAction} onClick={() => void approveRoom(room.id)}>
                         Phê duyệt room
                       </Button>
-                      <Button variant="destructive" disabled={!hasPending} onClick={() => void rejectRoom(room.id)}>
+                      <Button variant="destructive" disabled={!hasRoomAction} onClick={() => void rejectRoom(room.id)}>
                         Từ chối room
                       </Button>
                     </TableCell>

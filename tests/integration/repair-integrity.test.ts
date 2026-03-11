@@ -1,9 +1,10 @@
-import { EnrollmentStatus, FinanceStatus, WaitingEntryState } from "@prisma/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ApprovalStatus, EnrollmentStatus, FinanceStatus, WaitingEntryState } from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   auditRegistrationIntegrity,
   repairRegistrationIntegrity,
 } from "@/domain/services/registration-integrity.service";
+import { notificationService } from "@/domain/services/notification.service";
 import { prisma } from "@/lib/prisma";
 import { createTestDbContext, makePrefix } from "../support/db-fixtures";
 
@@ -12,9 +13,13 @@ describe.sequential("Registration integrity repair", () => {
 
   beforeEach(() => {
     ctx = createTestDbContext(makePrefix("repair-db"));
+    vi.spyOn(notificationService, "create").mockResolvedValue({ id: "notification" } as never);
+    vi.spyOn(notificationService, "createForAdmins").mockResolvedValue({ count: 0 } as never);
+    vi.spyOn(notificationService, "createForUsers").mockResolvedValue({ count: 0 } as never);
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await ctx.cleanup();
   });
 
@@ -90,6 +95,10 @@ describe.sequential("Registration integrity repair", () => {
     const waitingRoom = await ctx.createWaitingRoom({
       courseId: courseWaiting.id,
     });
+    await ctx.createApproval({
+      waitingRoomId: waitingRoom.id,
+      status: ApprovalStatus.APPROVED,
+    });
     await ctx.createWaitingEntry({
       waitingRoomId: waitingRoom.id,
       studentId: studentWaiting.id,
@@ -98,8 +107,32 @@ describe.sequential("Registration integrity repair", () => {
       matchedPriority: 1,
     });
 
+    const studentOrphanRoom = await ctx.createStudentAccount({ email: `${ctx.prefix}-orphan-room@ueh.edu.vn` });
+    const courseOrphanRoom = await ctx.createCourse({ code: `CRS-${ctx.token}-OA` });
+    const waitingSectionOrphanRoom = await ctx.createSection({
+      courseId: courseOrphanRoom.id,
+      roomId: room.id,
+      timeSlotId: timeSlot.id,
+      code: `SEC-${ctx.token}-OA`,
+      reservedCount: 0,
+      isWaitingOption: true,
+    });
+    const orphanWaitingRoom = await ctx.createWaitingRoom({
+      courseId: courseOrphanRoom.id,
+    });
+    await ctx.createWaitingEntry({
+      waitingRoomId: orphanWaitingRoom.id,
+      studentId: studentOrphanRoom.id,
+      state: WaitingEntryState.QUEUED,
+      offerSectionId: null,
+      prioritiesJson: [{ sectionId: waitingSectionOrphanRoom.id }],
+      matchedPriority: null,
+      expiresAt: null,
+    });
+
     const before = await auditRegistrationIntegrity();
     expect(before.clean).toBe(false);
+    expect(before.summary.orphanActiveWaitingRooms).toBe(1);
 
     const report = await repairRegistrationIntegrity();
 
@@ -107,9 +140,10 @@ describe.sequential("Registration integrity repair", () => {
     expect(report.repairs.voidedOrphanLedgers).toBeGreaterThanOrEqual(1);
     expect(report.repairs.createdMissingLedgers).toBeGreaterThanOrEqual(1);
     expect(report.repairs.reconciledSectionCounters).toBeGreaterThanOrEqual(1);
+    expect(report.repairs.restoredWaitingRoomApprovals).toBe(1);
     expect(report.after.clean).toBe(true);
 
-    const [reloadedSectionlessLedger, orphanLedgers, missingLedgerRows, repairedSections] = await Promise.all([
+    const [reloadedSectionlessLedger, orphanLedgers, missingLedgerRows, repairedSections, orphanRoomApprovals, orphanRoomEntry] = await Promise.all([
         prisma.financeLedger.findUnique({
           where: { id: sectionlessLedger.id },
         }),
@@ -129,11 +163,22 @@ describe.sequential("Registration integrity repair", () => {
         prisma.section.findMany({
           where: {
             id: {
-              in: [sectionMissingLedger.id, sectionSectionlessLedger.id, sectionWaiting.id],
+              in: [sectionMissingLedger.id, sectionSectionlessLedger.id, sectionWaiting.id, waitingSectionOrphanRoom.id],
             },
           },
           orderBy: {
             code: "asc",
+          },
+        }),
+        prisma.approval.findMany({
+          where: {
+            waitingRoomId: orphanWaitingRoom.id,
+          },
+        }),
+        prisma.waitingEntry.findFirst({
+          where: {
+            waitingRoomId: orphanWaitingRoom.id,
+            studentId: studentOrphanRoom.id,
           },
         }),
       ]);
@@ -144,6 +189,10 @@ describe.sequential("Registration integrity repair", () => {
     expect(missingLedgerRows).toHaveLength(1);
     expect(repairedSections.every((section) => section.registeredCount >= 0 && section.reservedCount >= 0)).toBe(true);
     expect(repairedSections.find((section) => section.id === sectionWaiting.id)?.reservedCount).toBe(1);
+    expect(repairedSections.find((section) => section.id === waitingSectionOrphanRoom.id)?.reservedCount).toBe(1);
+    expect(orphanRoomApprovals).toHaveLength(1);
+    expect(orphanRoomApprovals[0]?.status).toBe(ApprovalStatus.APPROVED);
+    expect(orphanRoomEntry?.state).toBe(WaitingEntryState.PENDING_ADMIN);
   });
 
   it("reports duplicate active enrollments and ambiguous sectionless ledgers as blockers during audit", async () => {
@@ -172,6 +221,7 @@ describe.sequential("Registration integrity repair", () => {
           matchingSectionIds: ["sec-1", "sec-2"],
         },
       ],
+      [],
       [],
       [],
     ];

@@ -1,5 +1,6 @@
-import { FinanceStatus, Prisma, PrismaClient } from "@prisma/client";
+import { ApprovalStatus, FinanceStatus, Prisma, PrismaClient } from "@prisma/client";
 import { TUITION_PER_CREDIT } from "@/lib/constants";
+import { matchingService } from "@/domain/services/matching.service";
 import { prisma } from "@/lib/prisma";
 
 type QueryClient = PrismaClient | Prisma.TransactionClient;
@@ -62,6 +63,17 @@ type ActiveEnrollmentWithoutLedgerRow = {
   credits: number;
 };
 
+type OrphanActiveWaitingRoomRow = {
+  waitingRoomId: string;
+  courseId: string;
+  courseCode: string;
+  activeEntryCount: number;
+  queuedCount: number;
+  pendingAdminCount: number;
+  offeredCount: number;
+  approvalCount: number;
+};
+
 type IntegrityAnomalies = {
   duplicateActiveEnrollment: DuplicateActiveEnrollmentRow[];
   duplicateActiveWaitingEntry: DuplicateActiveWaitingEntryRow[];
@@ -70,6 +82,7 @@ type IntegrityAnomalies = {
   sectionlessActiveLedgers: SectionlessActiveLedgerRow[];
   activeLedgersWithoutEnrollment: ActiveLedgerWithoutEnrollmentRow[];
   activeEnrollmentsWithoutLedger: ActiveEnrollmentWithoutLedgerRow[];
+  orphanActiveWaitingRooms: OrphanActiveWaitingRoomRow[];
 };
 
 export type RegistrationIntegrityAuditReport = {
@@ -84,6 +97,7 @@ export type RegistrationIntegrityAuditReport = {
     sectionlessActiveLedgers: number;
     activeLedgersWithoutEnrollment: number;
     activeEnrollmentsWithoutLedger: number;
+    orphanActiveWaitingRooms: number;
     migrationBlockers: number;
   };
   details: IntegrityAnomalies;
@@ -100,6 +114,7 @@ export type RegistrationIntegrityRepairReport = {
     createdMissingLedgers: number;
     deduplicatedLedgerRows: number;
     reconciledSectionCounters: number;
+    restoredWaitingRoomApprovals: number;
   };
 };
 
@@ -162,7 +177,7 @@ const invalidSectionCountersSql = `
       "offerSectionId" AS "sectionId",
       COUNT(*)::int AS "actualReservedCount"
     FROM "WaitingEntry"
-    WHERE "state" = 'OFFERED'
+    WHERE "state" IN ('PENDING_ADMIN', 'OFFERED')
       AND "offerSectionId" IS NOT NULL
     GROUP BY "offerSectionId"
   ) AS waiting_counts
@@ -258,6 +273,27 @@ const activeEnrollmentsWithoutLedgerSql = (hasEnrollmentCourseId: boolean) => `
   ORDER BY e."createdAt" DESC
 `;
 
+const orphanActiveWaitingRoomsSql = `
+  SELECT
+    wr.id AS "waitingRoomId",
+    wr."courseId" AS "courseId",
+    c.code AS "courseCode",
+    COUNT(DISTINCT we.id) FILTER (WHERE we."state" IN ('QUEUED', 'PENDING_ADMIN', 'OFFERED'))::int AS "activeEntryCount",
+    COUNT(DISTINCT we.id) FILTER (WHERE we."state" = 'QUEUED')::int AS "queuedCount",
+    COUNT(DISTINCT we.id) FILTER (WHERE we."state" = 'PENDING_ADMIN')::int AS "pendingAdminCount",
+    COUNT(DISTINCT we.id) FILTER (WHERE we."state" = 'OFFERED')::int AS "offeredCount",
+    COUNT(DISTINCT a.id)::int AS "approvalCount"
+  FROM "WaitingRoom" wr
+  JOIN "Course" c ON c.id = wr."courseId"
+  LEFT JOIN "WaitingEntry" we ON we."waitingRoomId" = wr.id
+  LEFT JOIN "Approval" a ON a."waitingRoomId" = wr.id
+  WHERE wr."isActive" = true
+  GROUP BY wr.id, wr."courseId", c.code
+  HAVING COUNT(DISTINCT a.id) = 0
+     AND COUNT(DISTINCT we.id) FILTER (WHERE we."state" IN ('QUEUED', 'PENDING_ADMIN', 'OFFERED')) > 0
+  ORDER BY c.code ASC
+`;
+
 const detectEnrollmentCourseId = async (client: QueryClient) => {
   const rows = await client.$queryRawUnsafe<Array<{ exists: boolean }>>(`
     SELECT EXISTS (
@@ -284,6 +320,7 @@ const loadIntegrityAnomalies = async (
     sectionlessActiveLedgers,
     activeLedgersWithoutEnrollment,
     activeEnrollmentsWithoutLedger,
+    orphanActiveWaitingRooms,
   ] = await Promise.all([
     client.$queryRawUnsafe<DuplicateActiveEnrollmentRow[]>(duplicateActiveEnrollmentSql(hasEnrollmentCourseId)),
     client.$queryRawUnsafe<DuplicateActiveWaitingEntryRow[]>(duplicateActiveWaitingEntrySql),
@@ -292,6 +329,7 @@ const loadIntegrityAnomalies = async (
     client.$queryRawUnsafe<SectionlessActiveLedgerRow[]>(sectionlessActiveLedgersSql(hasEnrollmentCourseId)),
     client.$queryRawUnsafe<ActiveLedgerWithoutEnrollmentRow[]>(activeLedgersWithoutEnrollmentSql),
     client.$queryRawUnsafe<ActiveEnrollmentWithoutLedgerRow[]>(activeEnrollmentsWithoutLedgerSql(hasEnrollmentCourseId)),
+    client.$queryRawUnsafe<OrphanActiveWaitingRoomRow[]>(orphanActiveWaitingRoomsSql),
   ]);
 
   return {
@@ -302,6 +340,7 @@ const loadIntegrityAnomalies = async (
     sectionlessActiveLedgers,
     activeLedgersWithoutEnrollment,
     activeEnrollmentsWithoutLedger,
+    orphanActiveWaitingRooms,
   };
 };
 
@@ -350,6 +389,7 @@ const buildAuditReport = (
     sectionlessActiveLedgers: anomalies.sectionlessActiveLedgers.length,
     activeLedgersWithoutEnrollment: anomalies.activeLedgersWithoutEnrollment.length,
     activeEnrollmentsWithoutLedger: anomalies.activeEnrollmentsWithoutLedger.length,
+    orphanActiveWaitingRooms: anomalies.orphanActiveWaitingRooms.length,
     migrationBlockers: blockers.length,
   };
 
@@ -382,7 +422,9 @@ export const repairRegistrationIntegrity = async (
     createdMissingLedgers: 0,
     deduplicatedLedgerRows: 0,
     reconciledSectionCounters: 0,
+    restoredWaitingRoomApprovals: 0,
   };
+  const roomsToRematch = new Set<string>();
 
   await client.$transaction(async (tx) => {
     const hasEnrollmentCourseId = await detectEnrollmentCourseId(tx);
@@ -507,7 +549,36 @@ export const repairRegistrationIntegrity = async (
       });
       repairs.reconciledSectionCounters += result.count;
     }
+
+    for (const row of anomalies.orphanActiveWaitingRooms) {
+      const existingApproval = await tx.approval.findFirst({
+        where: {
+          waitingRoomId: row.waitingRoomId,
+        },
+        select: {
+          id: true,
+        },
+      });
+      if (existingApproval) {
+        continue;
+      }
+
+      await tx.approval.create({
+        data: {
+          waitingRoomId: row.waitingRoomId,
+          status: ApprovalStatus.APPROVED,
+          reason: "Integrity repair restored missing approval anchor for active waiting room",
+          dueAt: new Date(),
+        },
+      });
+      repairs.restoredWaitingRoomApprovals += 1;
+      roomsToRematch.add(row.waitingRoomId);
+    }
   });
+
+  for (const waitingRoomId of roomsToRematch) {
+    await matchingService.matchWaitingRoom(waitingRoomId);
+  }
 
   const after = await auditRegistrationIntegrity(client);
   return {

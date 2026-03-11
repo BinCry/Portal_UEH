@@ -1,6 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import {
+  ApprovalStatus,
   CoursePlanType,
   DayOfWeek,
   EnrollmentStatus,
@@ -30,6 +31,7 @@ export const createTestDbContext = (prefix = makePrefix()) => {
     roomIds: [] as string[],
     timeSlotIds: [] as string[],
     waitingRoomIds: [] as string[],
+    approvalIds: [] as string[],
     waitingEntryIds: [] as string[],
     enrollmentIds: [] as string[],
     financeLedgerIds: [] as string[],
@@ -72,6 +74,30 @@ export const createTestDbContext = (prefix = makePrefix()) => {
                     18,
                   )}`,
                 faculty,
+              },
+            },
+          },
+        }),
+      );
+    },
+
+    async createAdminAccount({
+      email,
+      fullName,
+    }: {
+      email?: string;
+      fullName?: string;
+    } = {}) {
+      return track(
+        tracked.userIds,
+        await prisma.user.create({
+          data: {
+            email: email ?? `${prefix}-admin@ueh.edu.vn`,
+            passwordHash: DEFAULT_PASSWORD_HASH,
+            role: Role.ADMIN,
+            adminProfile: {
+              create: {
+                fullName: fullName ?? `Admin ${prefix}`,
               },
             },
           },
@@ -219,6 +245,33 @@ export const createTestDbContext = (prefix = makePrefix()) => {
             activatedAt: isActive ? new Date() : null,
             buffer,
             slaHours,
+          },
+        }),
+      );
+    },
+
+    async createApproval({
+      waitingRoomId,
+      status = ApprovalStatus.PENDING,
+      approvedById,
+      reason = null,
+      dueAt = new Date(Date.now() + 48 * 60 * 60 * 1000),
+    }: {
+      waitingRoomId: string;
+      status?: ApprovalStatus;
+      approvedById?: string | null;
+      reason?: string | null;
+      dueAt?: Date;
+    }) {
+      return track(
+        tracked.approvalIds,
+        await prisma.approval.create({
+          data: {
+            waitingRoomId,
+            status,
+            approvedById: approvedById ?? null,
+            reason,
+            dueAt,
           },
         }),
       );
@@ -408,9 +461,18 @@ export const createTestDbContext = (prefix = makePrefix()) => {
       if (tracked.waitingRoomIds.length) {
         await prisma.approval.deleteMany({
           where: {
-            waitingRoomId: {
-              in: tracked.waitingRoomIds,
-            },
+            OR: [
+              {
+                id: {
+                  in: tracked.approvalIds,
+                },
+              },
+              {
+                waitingRoomId: {
+                  in: tracked.waitingRoomIds,
+                },
+              },
+            ],
           },
         });
         await prisma.waitingRoom.deleteMany({
@@ -463,6 +525,13 @@ export const createTestDbContext = (prefix = makePrefix()) => {
       }
 
       if (tracked.userIds.length) {
+        await prisma.adminProfile.deleteMany({
+          where: {
+            userId: {
+              in: tracked.userIds,
+            },
+          },
+        });
         await prisma.studentProfile.deleteMany({
           where: {
             userId: {
