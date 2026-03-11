@@ -56,7 +56,7 @@ export const enrollmentService = {
         },
       });
       if (existingBySection?.status === EnrollmentStatus.ENROLLED) {
-        throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Ban da dang ky hoc phan nay");
+        throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Bạn đã đăng ký học phần này");
       }
 
       const existing = await tx.enrollment.findMany({
@@ -113,7 +113,7 @@ export const enrollmentService = {
             select: { status: true },
           });
           if (latest?.status === EnrollmentStatus.ENROLLED) {
-            throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Ban da dang ky hoc phan nay");
+            throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Bạn đã đăng ký học phần này");
           }
           throw new Error("Học phần đang được xử lý, vui lòng thử lại");
         }
@@ -138,7 +138,7 @@ export const enrollmentService = {
           });
         } catch (error) {
           if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-            throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Ban da dang ky hoc phan nay");
+            throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Bạn đã đăng ký học phần này");
           }
           throw error;
         }
@@ -327,16 +327,16 @@ export const enrollmentService = {
         },
       });
       if (!entry || entry.studentId !== studentId) {
-        throw new Error("Khong tim thay yeu cau");
+        throw new Error("Không tìm thấy yêu cầu");
       }
       if (entry.state !== WaitingEntryState.OFFERED) {
-        throw new DomainError("WAITING_STATE_CONFLICT", "Offer khong con hop le");
+        throw new DomainError("WAITING_STATE_CONFLICT", "Offer không còn hợp lệ");
       }
       if (isExpired(entry.expiresAt)) {
-        throw new Error("Offer da het han");
+        throw new Error("Offer đã hết hạn");
       }
       if (!entry.offerSectionId || !entry.offerSection) {
-        throw new Error("Lop de xuat khong hop le");
+        throw new Error("Lớp đề xuất không hợp lệ");
       }
 
       await assertNoActiveEnrollmentForCourse({
@@ -357,7 +357,7 @@ export const enrollmentService = {
         },
       });
       if (!updatedEntry.count) {
-        throw new DomainError("WAITING_STATE_CONFLICT", "Offer da duoc xu ly");
+        throw new DomainError("WAITING_STATE_CONFLICT", "Offer đã được xử lý");
       }
 
       const updatedSection = await tx.section.updateMany({
@@ -373,7 +373,7 @@ export const enrollmentService = {
         },
       });
       if (!updatedSection.count) {
-        throw new DomainError("WAITING_STATE_CONFLICT", "Khong the cap nhat giu cho cho offer");
+        throw new DomainError("WAITING_STATE_CONFLICT", "Không thể cập nhật giữ chỗ cho offer");
       }
 
       let enrollment;
@@ -398,7 +398,7 @@ export const enrollmentService = {
         });
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Ban da dang ky hoc phan nay");
+          throw new DomainError("ALREADY_ENROLLED_IN_COURSE", "Bạn đã đăng ký học phần này");
         }
         throw error;
       }
@@ -414,16 +414,16 @@ export const enrollmentService = {
 
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
-        title: "Da xac nhan lop tu phong cho",
+        title: "Đã xác nhận lớp từ phòng chờ",
         message:
-          "Ban da xac nhan lan cuoi thanh cong. Hoc phan da duoc ghi nhan vao hoc vu va tai chinh.",
+          "Bạn đã xác nhận lần cuối thành công. Học phần đã được ghi nhận vào học vụ và tài chính.",
         waitingEntryId: result.entry.id,
         waitingRoomId: result.entry.waitingRoomId,
         sectionId: result.entry.offerSectionId,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "Sinh vien da xac nhan lop phong cho",
-        message: `Sinh vien da xac nhan offer phong cho cho hoc phan ${result.entry.waitingRoom.course.code}.`,
+        title: "Sinh viên đã xác nhận lớp phòng chờ",
+        message: `Sinh viên đã xác nhận offer phòng chờ cho học phần ${result.entry.waitingRoom.course.code}.`,
         waitingEntryId: result.entry.id,
         waitingRoomId: result.entry.waitingRoomId,
         sectionId: result.entry.offerSectionId,
@@ -450,10 +450,10 @@ export const enrollmentService = {
       },
     });
     if (!entry || entry.studentId !== studentId) {
-      throw new Error("Khong tim thay yeu cau");
+      throw new Error("Không tìm thấy yêu cầu");
     }
     if (entry.state !== WaitingEntryState.OFFERED) {
-      throw new DomainError("WAITING_STATE_CONFLICT", "Offer khong con hop le");
+      throw new DomainError("WAITING_STATE_CONFLICT", "Offer không còn hợp lệ");
     }
 
     const matchedPriority = entry.matchedPriority ?? 3;
@@ -472,12 +472,12 @@ export const enrollmentService = {
         data: {
           state: WaitingEntryState.DECLINED,
           reason: isPriorityOneDecline
-            ? "Sinh vien tu choi de xuat uu tien 1"
-            : `Sinh vien tu choi de xuat uu tien ${matchedPriority}`,
+            ? "Sinh viên từ chối đề xuất ưu tiên 1"
+            : `Sinh viên từ chối đề xuất ưu tiên ${matchedPriority}`,
         },
       });
       if (!declined.count) {
-        throw new DomainError("WAITING_STATE_CONFLICT", "Offer da duoc xu ly");
+        throw new DomainError("WAITING_STATE_CONFLICT", "Offer đã được xử lý");
       }
 
       if (entry.offerSectionId) {
@@ -507,21 +507,21 @@ export const enrollmentService = {
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
         title: isPriorityOneDecline
-          ? "Canh bao: ban da tu choi de xuat uu tien 1"
-          : "Ban da tu choi de xuat uu tien 2/3",
+          ? "Cảnh báo: bạn đã từ chối đề xuất ưu tiên 1"
+          : "Bạn đã từ chối đề xuất ưu tiên 2/3",
         message: isPriorityOneDecline
-          ? "He thong ghi nhan: viec tu choi de xuat uu tien 1 co the anh huong den ket qua dang ky cua ban sau nay."
-          : `Ban bi mat quyen uu tien tam thoi den ${priorityPenaltyUntil?.toLocaleString("vi-VN")}.`,
+          ? "Hệ thống ghi nhận: việc từ chối đề xuất ưu tiên 1 có thể ảnh hưởng đến kết quả đăng ký của bạn sau này."
+          : `Bạn bị mất quyền ưu tiên tạm thời đến ${priorityPenaltyUntil?.toLocaleString("vi-VN")}.`,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
         matchedPriority,
         priorityPenaltyUntil: priorityPenaltyUntil?.toISOString() ?? null,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "Sinh vien tu choi offer phong cho",
+        title: "Sinh viên từ chối offer phòng chờ",
         message: isPriorityOneDecline
-          ? `Sinh vien vua tu choi de xuat uu tien 1 cua hoc phan ${entry.waitingRoom.course.code}. Da ghi nhan canh bao vi pham.`
-          : `Sinh vien vua tu choi de xuat uu tien ${matchedPriority} cua hoc phan ${entry.waitingRoom.course.code}. Da ap dung mat quyen uu tien tam thoi.`,
+          ? `Sinh viên vừa từ chối đề xuất ưu tiên 1 của học phần ${entry.waitingRoom.course.code}. Đã ghi nhận cảnh báo vi phạm.`
+          : `Sinh viên vừa từ chối đề xuất ưu tiên ${matchedPriority} của học phần ${entry.waitingRoom.course.code}. Đã áp dụng mất quyền ưu tiên tạm thời.`,
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
         studentId,
@@ -566,7 +566,7 @@ export const enrollmentService = {
           },
           data: {
             state: WaitingEntryState.EXPIRED,
-            reason: "Qua han xac nhan 24h",
+            reason: "Quá hạn xác nhận 24h",
           },
         });
         if (!updated.count) {
@@ -597,8 +597,8 @@ export const enrollmentService = {
       expiredCount += 1;
 
       await notificationService.create(entry.studentId, NotificationType.WAITING_EXPIRED, {
-        title: "Offer phong cho da het han",
-        message: "Ban chua xac nhan lan cuoi trong 24 gio nen offer da het hieu luc.",
+        title: "Offer phòng chờ đã hết hạn",
+        message: "Bạn chưa xác nhận lần cuối trong 24 giờ nên offer đã hết hiệu lực.",
         waitingEntryId: entry.id,
         waitingRoomId: entry.waitingRoomId,
       });
@@ -609,8 +609,8 @@ export const enrollmentService = {
 
     if (expiredCount) {
       await notificationService.createForAdmins("SYSTEM", {
-        title: "Co offer phong cho het han",
-        message: `Co ${expiredCount} offer da het han va he thong da tu dong chuyen suat cho hang doi tiep theo.`,
+        title: "Có offer phòng chờ hết hạn",
+        message: `Có ${expiredCount} offer đã hết hạn và hệ thống đã tự động chuyển suất cho hàng đợi tiếp theo.`,
         expiredCount,
         waitingRoomIds: [...touchedRooms],
       });

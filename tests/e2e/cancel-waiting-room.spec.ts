@@ -68,13 +68,13 @@ test("cancel waiting-confirmed enrollment removes finance row and drops admin re
     const cancelRow = page
       .locator("tbody tr")
       .filter({ hasText: course.code })
-      .filter({ has: page.getByRole("button", { name: /Hủy học phần|Huy hoc phan/i }) });
+      .filter({ has: page.getByRole("button", { name: /Hủy học phần/i }) });
     await expect(cancelRow).toHaveCount(1);
 
-    await cancelRow.getByRole("button", { name: /Hủy học phần|Huy hoc phan/i }).click();
+    await cancelRow.getByRole("button", { name: /Hủy học phần/i }).click();
     await Promise.all([
       page.waitForResponse((response) => response.url().includes("/api/enrollments/cancel") && response.ok()),
-      page.getByRole("button", { name: /Xác nhận hủy|Xac nhan huy/i }).click(),
+      page.getByRole("button", { name: /Xác nhận hủy/i }).click(),
     ]);
 
     await page.goto("/student/finance");

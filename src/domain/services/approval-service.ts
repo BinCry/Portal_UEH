@@ -101,7 +101,7 @@ export const approvalService = {
       });
 
       if (!room) {
-        throw new Error("Khong tim thay phong cho");
+        throw new Error("Không tìm thấy phòng chờ");
       }
 
       const pending = await tx.approval.findFirst({
@@ -120,7 +120,7 @@ export const approvalService = {
           data: {
             status: ApprovalStatus.APPROVED,
             approvedById,
-            reason: reason ?? "Phe duyet thu cong",
+            reason: reason ?? "Phê duyệt thủ công",
           },
         })
         : latestApproval &&
@@ -132,7 +132,7 @@ export const approvalService = {
               waitingRoomId,
               status: ApprovalStatus.APPROVED,
               approvedById,
-              reason: reason ?? "Phe duyet thu cong",
+              reason: reason ?? "Phê duyệt thủ công",
               dueAt: now(),
             },
           });
@@ -158,9 +158,9 @@ export const approvalService = {
         entries.map((entry) => entry.studentId),
         "SYSTEM",
         {
-          title: "Phong cho da duoc phe duyet",
+          title: "Phòng chờ đã được phê duyệt",
           message:
-            "Phong dao tao da phe duyet phong cho. He thong dang map nguyen vong va gui tung de xuat de admin duyet cuoi.",
+            "Phòng đào tạo đã phê duyệt phòng chờ. Hệ thống đang map nguyện vọng và gửi từng đề xuất để admin duyệt cuối.",
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -170,8 +170,8 @@ export const approvalService = {
       await notificationService.createForAdmins(
         "SYSTEM",
         {
-          title: "Da phe duyet phong cho",
-          message: `Phong cho hoc phan ${room.course.code} da duoc phe duyet.`,
+          title: "Đã phê duyệt phòng chờ",
+          message: `Phòng chờ học phần ${room.course.code} đã được phê duyệt.`,
           waitingRoomId,
           courseCode: room.course.code,
           courseName: room.course.name,
@@ -184,8 +184,8 @@ export const approvalService = {
     const matchResult = await matchingService.matchWaitingRoom(waitingRoomId);
     if (room) {
       await notificationService.createForAdmins("SYSTEM", {
-        title: "Ket qua map hang doi",
-        message: `Hoc phan ${room.course.code}: ${matchResult.pendingAdmin} de xuat dang cho admin duyet, ${matchResult.failed} khong phan duoc.`,
+        title: "Kết quả map hàng đợi",
+        message: `Học phần ${room.course.code}: ${matchResult.pendingAdmin} đề xuất đang chờ admin duyệt, ${matchResult.failed} chưa phân được.`,
         waitingRoomId,
         courseCode: room.course.code,
         pendingAdmin: matchResult.pendingAdmin,

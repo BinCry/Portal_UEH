@@ -44,7 +44,7 @@ export const waitingEntryService = {
     priorities: PriorityInput[];
   }) {
     if (!acceptedTerms) {
-      throw new Error("Ban can dong y dieu khoan tham gia phong cho");
+      throw new Error("Bạn cần đồng ý điều khoản tham gia phòng chờ");
     }
 
     const [studentProfile, studentUser, course] = await Promise.all([
@@ -115,7 +115,7 @@ export const waitingEntryService = {
       },
     });
     if (existing) {
-      throw new DomainError("WAITING_ACTIVE_ENTRY_EXISTS", "Ban da co yeu cau dang cho xu ly");
+      throw new DomainError("WAITING_ACTIVE_ENTRY_EXISTS", "Bạn đã có yêu cầu đang chờ xử lý");
     }
 
     const priorityPenaltyActive = isFutureDate(studentProfile.priorityPenaltyUntil);
@@ -138,7 +138,7 @@ export const waitingEntryService = {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        throw new DomainError("WAITING_ACTIVE_ENTRY_EXISTS", "Ban da co yeu cau dang cho xu ly");
+        throw new DomainError("WAITING_ACTIVE_ENTRY_EXISTS", "Bạn đã có yêu cầu đang chờ xử lý");
       }
       throw error;
     }

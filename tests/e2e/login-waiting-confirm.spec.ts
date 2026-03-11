@@ -35,12 +35,12 @@ test("waiting confirm creates finance row for the offered section", async ({ pag
     const actionRow = page
       .locator("tbody tr")
       .filter({ hasText: course.code })
-      .filter({ has: page.getByRole("button", { name: /Xác nhận|Xac nhan/i }) });
+      .filter({ has: page.getByRole("button", { name: /Xác nhận/i }) });
     await expect(actionRow).toHaveCount(1);
 
     await Promise.all([
       page.waitForResponse((response) => response.url().includes("/api/waiting/confirm") && response.ok()),
-      actionRow.getByRole("button", { name: /Xác nhận|Xac nhan/i }).click(),
+      actionRow.getByRole("button", { name: /Xác nhận/i }).click(),
     ]);
 
     await page.goto("/student/finance");

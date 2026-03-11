@@ -41,7 +41,7 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
     const roomRow = adminPage.locator("tbody tr").filter({ hasText: course.code }).first();
     await expect(roomRow).toBeVisible();
     await expect(roomRow).toContainText("FIFO 1");
-    await expect(roomRow).toContainText(/Cần khôi phục duyệt|Can khoi phuc duyet/i);
+    await expect(roomRow).toContainText(/Cần khôi phục duyệt/i);
     const queuedRow = adminPage
       .locator("tbody tr")
       .filter({ hasText: course.code })
@@ -83,14 +83,14 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
     const confirmRow = studentPage
       .locator("tbody tr")
       .filter({ hasText: course.code })
-      .filter({ has: studentPage.getByRole("button", { name: /Xác nhận|Xac nhan/i }) });
+      .filter({ has: studentPage.getByRole("button", { name: /Xác nhận/i }) });
     await expect(confirmRow).toHaveCount(1);
 
     await Promise.all([
       studentPage.waitForResponse(
         (response) => response.url().includes("/api/waiting/confirm") && response.ok(),
       ),
-      confirmRow.getByRole("button", { name: /Xác nhận|Xac nhan/i }).click(),
+      confirmRow.getByRole("button", { name: /Xác nhận/i }).click(),
     ]);
 
     await studentPage.goto("/student/finance");

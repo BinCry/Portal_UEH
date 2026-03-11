@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     });
 
     if (!otp || otp.expiresAt <= now()) {
-      return fail({ code: "OTP_EXPIRED", message: "OTP da het han" }, 400);
+      return fail({ code: "OTP_EXPIRED", message: "OTP đã hết hạn" }, 400);
     }
 
     const isValid = verifyOtpHash(body.code, otp.codeHash);
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     return ok({
       verified: true,
-      message: "OTP hop le",
+      message: "OTP hợp lệ",
     });
   } catch (error) {
     return fail(

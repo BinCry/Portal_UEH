@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return fail(
         {
           code: "RATE_LIMIT",
-          message: "Ban da gui OTP qua nhieu lan, vui long thu lai sau.",
+          message: "Bạn đã gửi OTP quá nhiều lần, vui lòng thử lại sau.",
         },
         429,
       );

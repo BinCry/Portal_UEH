@@ -175,7 +175,7 @@ export const matchingService = {
             userId: entry.studentId,
             type: NotificationType.SYSTEM,
             payload: {
-              title: "Phong cho chua the cap lop",
+              title: "Phòng chờ chưa thể cấp lớp",
               message,
               waitingEntryId: entry.id,
               waitingRoomId,
@@ -186,7 +186,7 @@ export const matchingService = {
         };
 
         if (!priorities.length) {
-          await failCurrentEntry("Khong co nguyen vong hop le", "Yeu cau phong cho chua co nguyen vong hop le.");
+          await failCurrentEntry("Không có nguyện vọng hợp lệ", "Yêu cầu phòng chờ chưa có nguyện vọng hợp lệ.");
           continue;
         }
 
@@ -195,8 +195,8 @@ export const matchingService = {
 
         if (!effectivePriorities.length) {
           await failCurrentEntry(
-            "Dang tam mat quyen uu tien, vui long cap nhat lai nguyen vong",
-            "Ban dang bi mat quyen uu tien tam thoi, he thong chua the xet nguyen vong hien tai.",
+            "Đang tạm mất quyền ưu tiên, vui lòng cập nhật lại nguyện vọng",
+            "Bạn đang bị mất quyền ưu tiên tạm thời, hệ thống chưa thể xét nguyện vọng hiện tại.",
           );
           continue;
         }
@@ -218,8 +218,8 @@ export const matchingService = {
 
         if (existingEnrollments.some((enrollment) => enrollment.courseId === entry.waitingRoom.courseId)) {
           await failCurrentEntry(
-            "Sinh vien da co lop ENROLLED cho hoc phan nay",
-            "Ban da dang ky hoc phan nay o lop khac. Khong the xep them tu phong cho.",
+            "Sinh viên đã có lớp ENROLLED cho học phần này",
+            "Bạn đã đăng ký học phần này ở lớp khác. Không thể xếp thêm từ phòng chờ.",
           );
           continue;
         }
@@ -270,8 +270,8 @@ export const matchingService = {
 
         if (!assignedSectionId || !matchedPriority) {
           await failCurrentEntry(
-            "Khong tim thay lop bo sung phu hop theo nguyen vong",
-            "Chua tim duoc lop bo sung phu hop theo danh sach nguyen vong cua ban.",
+            "Không tìm thấy lớp bổ sung phù hợp theo nguyện vọng",
+            "Chưa tìm được lớp bổ sung phù hợp theo danh sách nguyện vọng của bạn.",
           );
           continue;
         }
@@ -289,8 +289,8 @@ export const matchingService = {
             lastNotifiedAt: now(),
             reason:
               matchedPriority === 1
-                ? "He thong de xuat theo uu tien 1, cho admin duyet"
-                : `Uu tien 1 het cho, de xuat theo uu tien ${matchedPriority}, cho admin duyet`,
+                ? "Hệ thống đề xuất theo ưu tiên 1, chờ admin duyệt"
+                : `Ưu tiên 1 hết chỗ, đề xuất theo ưu tiên ${matchedPriority}, chờ admin duyệt`,
           },
         });
 
@@ -315,11 +315,11 @@ export const matchingService = {
             userId: entry.studentId,
             type: NotificationType.SYSTEM,
             payload: {
-              title: "Da tim thay lop bo sung, dang cho admin duyet",
+              title: "Đã tìm thấy lớp bổ sung, đang chờ admin duyệt",
               message:
                 matchedPriority === 1
-                  ? `He thong da tim thay lop ${assignedSectionCode ?? assignedSectionId} theo uu tien 1. Vui long cho admin duyet.`
-                  : `Uu tien 1 hien da het cho. He thong de xuat lop ${assignedSectionCode ?? assignedSectionId} theo uu tien ${matchedPriority}.`,
+                  ? `Hệ thống đã tìm thấy lớp ${assignedSectionCode ?? assignedSectionId} theo ưu tiên 1. Vui lòng chờ admin duyệt.`
+                  : `Ưu tiên 1 hiện đã hết chỗ. Hệ thống đề xuất lớp ${assignedSectionCode ?? assignedSectionId} theo ưu tiên ${matchedPriority}.`,
               waitingEntryId: entry.id,
               waitingRoomId,
               sectionId: assignedSectionId,
@@ -332,10 +332,10 @@ export const matchingService = {
             target: "admins",
             type: NotificationType.SYSTEM,
             payload: {
-              title: "Can duyet de xuat phong cho",
-              message: `${entry.student.studentProfile?.fullName ?? entry.student.email} dang cho duyet de xuat lop ${
+              title: "Cần duyệt đề xuất phòng chờ",
+              message: `${entry.student.studentProfile?.fullName ?? entry.student.email} đang chờ duyệt đề xuất lớp ${
                 assignedSectionCode ?? assignedSectionId
-              } (uu tien ${matchedPriority}) cho hoc phan ${entry.waitingRoom.course.code}.`,
+              } (ưu tiên ${matchedPriority}) cho học phần ${entry.waitingRoom.course.code}.`,
               waitingEntryId: entry.id,
               waitingRoomId,
               studentId: entry.studentId,

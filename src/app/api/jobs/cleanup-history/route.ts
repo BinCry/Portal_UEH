@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return fail(
       {
         code: "HISTORY_CLEANUP_FAILED",
-        message: "Khong the don lich su he thong",
+        message: "Không thể dọn lịch sử hệ thống",
         details: error,
       },
       500,

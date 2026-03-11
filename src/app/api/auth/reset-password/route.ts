@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       orderBy: { createdAt: "desc" },
     });
     if (!otp || otp.expiresAt <= now() || !verifyOtpHash(body.code, otp.codeHash)) {
-      return fail({ code: "INVALID_OTP", message: "OTP không hợp lệ hoac het han" }, 400);
+      return fail({ code: "INVALID_OTP", message: "OTP không hợp lệ hoặc hết hạn" }, 400);
     }
 
     const newHash = await hashPassword(body.newPassword);
