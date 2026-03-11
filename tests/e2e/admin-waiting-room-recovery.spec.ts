@@ -3,7 +3,9 @@ import { WaitingEntryState } from "@prisma/client";
 import { createTestDbContext, makePrefix } from "../support/db-fixtures";
 import { login, loginAdmin } from "./helpers/auth";
 
-test("admin recovers orphan waiting room, approves entry, and student confirms the offer", async ({ browser }) => {
+test("admin recovers orphan waiting room, approves entry, and student confirms the offer", async ({
+  browser,
+}) => {
   const ctx = createTestDbContext(makePrefix("pw-admin-recovery"));
 
   try {
@@ -39,22 +41,36 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
     const roomRow = adminPage.locator("tbody tr").filter({ hasText: course.code }).first();
     await expect(roomRow).toBeVisible();
     await expect(roomRow).toContainText("FIFO 1");
-    await expect(roomRow).toContainText("Can khoi phuc duyet");
+    await expect(roomRow).toContainText(/Cần khôi phục duyệt|Can khoi phuc duyet/i);
+    const queuedRow = adminPage
+      .locator("tbody tr")
+      .filter({ hasText: course.code })
+      .filter({ hasText: studentName })
+      .filter({ hasText: "#1" })
+      .first();
+    await expect(queuedRow).toBeVisible();
 
     await Promise.all([
       adminPage.waitForResponse(
-        (response) => response.url().includes(`/api/admin/waiting/${waitingRoom.id}/approve`) && response.ok(),
+        (response) =>
+          response.url().includes(`/api/admin/waiting/${waitingRoom.id}/approve`) && response.ok(),
       ),
       roomRow.getByRole("button", { name: /Phê duyệt room/i }).click(),
     ]);
 
-    const entryRow = adminPage.locator("tbody tr").filter({ hasText: course.code }).filter({ hasText: studentName }).first();
+    const entryRow = adminPage
+      .locator("tbody tr")
+      .filter({ hasText: course.code })
+      .filter({ hasText: studentName })
+      .first();
     await expect(entryRow).toBeVisible();
     await expect(entryRow).toContainText(waitingSection.code);
 
     await Promise.all([
       adminPage.waitForResponse(
-        (response) => response.url().includes(`/api/admin/waiting/entries/${waitingEntry.id}/approve`) && response.ok(),
+        (response) =>
+          response.url().includes(`/api/admin/waiting/entries/${waitingEntry.id}/approve`) &&
+          response.ok(),
       ),
       entryRow.getByRole("button", { name: /Duyệt entry/i }).click(),
     ]);
@@ -71,7 +87,9 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
     await expect(confirmRow).toHaveCount(1);
 
     await Promise.all([
-      studentPage.waitForResponse((response) => response.url().includes("/api/waiting/confirm") && response.ok()),
+      studentPage.waitForResponse(
+        (response) => response.url().includes("/api/waiting/confirm") && response.ok(),
+      ),
       confirmRow.getByRole("button", { name: /Xác nhận|Xac nhan/i }).click(),
     ]);
 

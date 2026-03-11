@@ -1,7 +1,5 @@
 import { EnrollmentStatus, NotificationType, Prisma, WaitingEntryState } from "@prisma/client";
-import {
-  WAITING_PRIORITY_PENALTY_DAYS,
-} from "@/lib/constants";
+import { WAITING_PRIORITY_PENALTY_DAYS } from "@/lib/constants";
 import { DomainError } from "@/domain/errors/domain-error";
 import { prisma } from "@/lib/prisma";
 import { addDaysFromNow, isExpired, now } from "@/lib/time";
@@ -74,7 +72,12 @@ export const enrollmentService = {
           },
         },
       });
-      if (hasScheduleConflict(section, existing.map((x) => x.section))) {
+      if (
+        hasScheduleConflict(
+          section,
+          existing.map((x) => x.section),
+        )
+      ) {
         throw new Error("Trùng lịch học");
       }
 
@@ -293,9 +296,7 @@ export const enrollmentService = {
     ]);
 
     if (result.courseWaitingRoomId) {
-      void matchingService.matchWaitingRoom(result.courseWaitingRoomId).catch((error) => {
-        console.error("Lỗi khi tự động dò tìm phòng chờ sau khi hủy học phần:", error);
-      });
+      await matchingService.matchWaitingRoom(result.courseWaitingRoomId);
     }
 
     return {
@@ -414,7 +415,8 @@ export const enrollmentService = {
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
         title: "Da xac nhan lop tu phong cho",
-        message: "Ban da xac nhan lan cuoi thanh cong. Hoc phan da duoc ghi nhan vao hoc vu va tai chinh.",
+        message:
+          "Ban da xac nhan lan cuoi thanh cong. Hoc phan da duoc ghi nhan vao hoc vu va tai chinh.",
         waitingEntryId: result.entry.id,
         waitingRoomId: result.entry.waitingRoomId,
         sectionId: result.entry.offerSectionId,
@@ -456,7 +458,9 @@ export const enrollmentService = {
 
     const matchedPriority = entry.matchedPriority ?? 3;
     const isPriorityOneDecline = matchedPriority === 1;
-    const priorityPenaltyUntil = !isPriorityOneDecline ? addDaysFromNow(WAITING_PRIORITY_PENALTY_DAYS) : null;
+    const priorityPenaltyUntil = !isPriorityOneDecline
+      ? addDaysFromNow(WAITING_PRIORITY_PENALTY_DAYS)
+      : null;
 
     await prisma.$transaction(async (tx) => {
       const declined = await tx.waitingEntry.updateMany({
@@ -615,10 +619,3 @@ export const enrollmentService = {
     return { expiredCount };
   },
 };
-
-
-
-
-
-
-

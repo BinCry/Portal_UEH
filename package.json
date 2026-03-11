@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
+    "test:integration": "vitest run --maxWorkers=1 tests/integration",
     "test:e2e": "npm run prisma:seed && npm run repair:integrity -- --apply && playwright test",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

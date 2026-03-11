@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { differenceInHours } from "date-fns";
@@ -8,7 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { displayText } from "@/lib/text";
 
 type WaitingRoom = {
   id: string;
@@ -35,6 +43,16 @@ type WaitingRoom = {
     reason: string | null;
     updatedAt: string;
   } | null;
+  queuedEntries: Array<{
+    id: string;
+    studentId: string;
+    studentName: string;
+    studentCode: string | null;
+    state: "QUEUED";
+    joinedAt: string;
+    fifoPosition: number;
+    reason: string | null;
+  }>;
   pendingEntries: Array<{
     id: string;
     studentId: string;
@@ -52,10 +70,10 @@ type WaitingRoom = {
 };
 
 const statusLabel: Record<WaitingRoom["roomStatus"], string> = {
-  PENDING_REVIEW: "Dang cho duyet",
-  APPROVED_ACTIVE: "Da duoc duyet",
-  REJECTED_CLOSED: "Da dong",
-  ORPHAN_ACTIVE: "Can khoi phuc duyet",
+  PENDING_REVIEW: "Đang chờ duyệt",
+  APPROVED_ACTIVE: "Đã được duyệt",
+  REJECTED_CLOSED: "Đã đóng",
+  ORPHAN_ACTIVE: "Cần khôi phục duyệt",
 };
 
 const statusBadgeVariant = (status: WaitingRoom["roomStatus"]) => {
@@ -149,6 +167,19 @@ export const WaitingRoomsManager = () => {
     await load();
   };
 
+  const queuedEntries = useMemo(
+    () =>
+      rooms.flatMap((room) =>
+        room.queuedEntries.map((entry) => ({
+          ...entry,
+          roomId: room.id,
+          courseCode: room.course.code,
+          courseName: room.course.name,
+        })),
+      ),
+    [rooms],
+  );
+
   const pendingEntries = useMemo(
     () =>
       rooms.flatMap((room) =>
@@ -178,7 +209,9 @@ export const WaitingRoomsManager = () => {
         </div>
 
         {rooms.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Không có waiting room đang active hoặc gần đây.</p>
+          <p className="text-muted-foreground text-sm">
+            Không có waiting room đang active hoặc gần đây.
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -193,9 +226,15 @@ export const WaitingRoomsManager = () => {
             </TableHeader>
             <TableBody>
               {rooms.map((room) => {
-                const dueAt = room.pendingApproval?.dueAt ? new Date(room.pendingApproval.dueAt) : null;
+                const dueAt = room.pendingApproval?.dueAt
+                  ? new Date(room.pendingApproval.dueAt)
+                  : null;
                 const countdown = dueAt ? differenceInHours(dueAt, new Date()) : null;
-                const hasRoomAction = room.hasPendingApproval || room.isOrphanActive;
+                const canReprocessQueue =
+                  room.roomStatus === "APPROVED_ACTIVE" && room.queuedCount > 0;
+                const hasApproveAction =
+                  room.hasPendingApproval || room.isOrphanActive || canReprocessQueue;
+                const hasRejectAction = room.hasPendingApproval || room.isOrphanActive;
 
                 return (
                   <TableRow key={room.id}>
@@ -203,25 +242,35 @@ export const WaitingRoomsManager = () => {
                       <p className="font-medium">
                         {room.course.code} - {room.course.name}
                       </p>
-                      <p className="text-muted-foreground text-xs">{room.isActive ? "Đang mở" : "Đã đóng"}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {room.isActive ? "Đang mở" : "Đã đóng"}
+                      </p>
                     </TableCell>
                     <TableCell>
                       <p className="font-sans tabular-nums">{room.waitingCount}</p>
                       <p className="text-muted-foreground text-xs">
-                        FIFO {room.queuedCount} | Admin {room.pendingAdminCount} | Offer {room.offeredCount}
+                        FIFO {room.queuedCount} | Admin {room.pendingAdminCount} | Offer{" "}
+                        {room.offeredCount}
                       </p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={room.pendingAdminCount ? "default" : "secondary"}>{room.pendingAdminCount}</Badge>
+                      <Badge variant={room.pendingAdminCount ? "default" : "secondary"}>
+                        {room.pendingAdminCount}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={statusBadgeVariant(room.roomStatus)}>{statusLabel[room.roomStatus]}</Badge>
+                      <Badge variant={statusBadgeVariant(room.roomStatus)}>
+                        {statusLabel[room.roomStatus]}
+                      </Badge>
                       {room.latestApproval?.reason ? (
-                        <p className="text-muted-foreground mt-1 text-xs">{room.latestApproval.reason}</p>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          {displayText(room.latestApproval.reason)}
+                        </p>
                       ) : null}
                       {room.isOrphanActive ? (
                         <p className="text-muted-foreground mt-1 text-xs">
-                          Room dang mo nhung thieu approval history. Co the phe duyet lai de khoi phuc.
+                          Room đang mở nhưng thiếu approval history. Có thể phê duyệt lại để khôi
+                          phục.
                         </p>
                       ) : null}
                     </TableCell>
@@ -229,21 +278,41 @@ export const WaitingRoomsManager = () => {
                       {dueAt ? (
                         <>
                           <p>{dueAt.toLocaleString("vi-VN")}</p>
-                          <Badge variant={countdown !== null && countdown < 0 ? "destructive" : "secondary"}>
+                          <Badge
+                            variant={
+                              countdown !== null && countdown < 0 ? "destructive" : "secondary"
+                            }
+                          >
                             {countdown !== null ? `${countdown} giờ` : "--"}
                           </Badge>
                         </>
                       ) : room.isOrphanActive ? (
-                        <span className="text-muted-foreground text-xs">Can khoi phuc approval anchor</span>
+                        <span className="text-muted-foreground text-xs">
+                          Cần khôi phục approval anchor
+                        </span>
+                      ) : canReprocessQueue ? (
+                        <span className="text-muted-foreground text-xs">
+                          Có FIFO đang chờ ghép lớp
+                        </span>
                       ) : (
-                        <span className="text-muted-foreground text-xs">Không còn SLA chờ xử lý</span>
+                        <span className="text-muted-foreground text-xs">
+                          Không còn SLA chờ xử lý
+                        </span>
                       )}
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
-                      <Button className="primary-glow" disabled={!hasRoomAction} onClick={() => void approveRoom(room.id)}>
-                        Phê duyệt room
+                      <Button
+                        className="primary-glow"
+                        disabled={!hasApproveAction}
+                        onClick={() => void approveRoom(room.id)}
+                      >
+                        {canReprocessQueue ? "Xử lý FIFO" : "Phê duyệt room"}
                       </Button>
-                      <Button variant="destructive" disabled={!hasRoomAction} onClick={() => void rejectRoom(room.id)}>
+                      <Button
+                        variant="destructive"
+                        disabled={!hasRejectAction}
+                        onClick={() => void rejectRoom(room.id)}
+                      >
                         Từ chối room
                       </Button>
                     </TableCell>
@@ -253,6 +322,51 @@ export const WaitingRoomsManager = () => {
             </TableBody>
           </Table>
         )}
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-base font-semibold">Danh sách sinh viên đang chờ FIFO</h3>
+            <Badge variant="outline">{queuedEntries.length} entry</Badge>
+          </div>
+          {queuedEntries.length === 0 ? (
+            <p className="text-muted-foreground mb-6 text-sm">
+              Chưa có entry nào đang chờ ghép lớp trong FIFO.
+            </p>
+          ) : (
+            <Table className="mb-6">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Học phần</TableHead>
+                  <TableHead>Sinh viên</TableHead>
+                  <TableHead>Vị trí FIFO</TableHead>
+                  <TableHead>Ngày nhập</TableHead>
+                  <TableHead>Ghi chú</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {queuedEntries.map((entry) => (
+                  <TableRow key={entry.id}>
+                    <TableCell>
+                      <p className="font-medium">{entry.courseCode}</p>
+                      <p className="text-muted-foreground text-xs">{entry.courseName}</p>
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium">{entry.studentName}</p>
+                      <p className="text-muted-foreground text-xs">{entry.studentCode ?? "N/A"}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">#{entry.fifoPosition}</Badge>
+                    </TableCell>
+                    <TableCell>{new Date(entry.joinedAt).toLocaleString("vi-VN")}</TableCell>
+                    <TableCell>
+                      {displayText(entry.reason) ?? "Đang chờ hệ thống ghép lớp phù hợp"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
 
         <div>
           <div className="mb-2 flex items-center justify-between">
@@ -292,7 +406,7 @@ export const WaitingRoomsManager = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(entry.joinedAt).toLocaleString("vi-VN")}</TableCell>
-                    <TableCell>{entry.reason ?? "-"}</TableCell>
+                    <TableCell>{displayText(entry.reason) ?? "-"}</TableCell>
                     <TableCell className="space-x-2 text-right">
                       <Button
                         className="primary-glow"

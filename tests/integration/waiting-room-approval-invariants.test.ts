@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { approvalService } from "@/domain/services/approval-service";
 import { matchingService } from "@/domain/services/matching.service";
 import { notificationService } from "@/domain/services/notification.service";
+import { waitingEntryService } from "@/domain/services/waiting-entry.service";
 import { historyCleanupService } from "@/domain/services/history-cleanup.service";
 import { prisma } from "@/lib/prisma";
 import { createTestDbContext, makePrefix } from "../support/db-fixtures";
@@ -89,7 +90,11 @@ describe.sequential("Waiting room approval invariants", () => {
       expiresAt: null,
     });
 
-    const approval = await approvalService.manualApprove(waitingRoom.id, admin.id, "Recover orphan room");
+    const approval = await approvalService.manualApprove(
+      waitingRoom.id,
+      admin.id,
+      "Recover orphan room",
+    );
 
     const [approvals, entry, section] = await Promise.all([
       prisma.approval.findMany({
@@ -107,9 +112,56 @@ describe.sequential("Waiting room approval invariants", () => {
     expect(section?.reservedCount).toBe(1);
   });
 
+  it("joining an approved waiting room immediately advances the student to pending-admin when a slot exists", async () => {
+    const student = await ctx.createStudentAccount();
+    const course = await ctx.createCourse({ code: `CRS-${ctx.token}-JOIN` });
+    const room = await ctx.createRoom();
+    const timeSlot = await ctx.createTimeSlot();
+    await ctx.createSection({
+      courseId: course.id,
+      roomId: room.id,
+      timeSlotId: timeSlot.id,
+      code: `SEC-${ctx.token}-MAIN`,
+      capacity: 5,
+      registeredCount: 0,
+      isWaitingOption: false,
+    });
+    const waitingSection = await ctx.createSection({
+      courseId: course.id,
+      roomId: room.id,
+      timeSlotId: timeSlot.id,
+      code: `SEC-${ctx.token}-JOIN`,
+      isWaitingOption: true,
+      capacity: 5,
+    });
+    const waitingRoom = await ctx.createWaitingRoom({ courseId: course.id });
+    await ctx.createApproval({
+      waitingRoomId: waitingRoom.id,
+      status: ApprovalStatus.APPROVED,
+    });
+
+    const result = await waitingEntryService.join({
+      courseId: course.id,
+      studentId: student.id,
+      acceptedTerms: true,
+      priorities: [{ sectionId: waitingSection.id }],
+    });
+
+    const [entry, section] = await Promise.all([
+      prisma.waitingEntry.findUnique({ where: { id: result.entry.id } }),
+      prisma.section.findUnique({ where: { id: waitingSection.id } }),
+    ]);
+
+    expect(entry?.state).toBe(WaitingEntryState.PENDING_ADMIN);
+    expect(entry?.offerSectionId).toBe(waitingSection.id);
+    expect(section?.reservedCount).toBe(1);
+  });
+
   it("rejecting a pending-admin entry releases the slot and rematches the next queued student", async () => {
     const admin = await ctx.createAdminAccount();
-    const currentStudent = await ctx.createStudentAccount({ email: `${ctx.prefix}-current@ueh.edu.vn` });
+    const currentStudent = await ctx.createStudentAccount({
+      email: `${ctx.prefix}-current@ueh.edu.vn`,
+    });
     const nextStudent = await ctx.createStudentAccount({ email: `${ctx.prefix}-next@ueh.edu.vn` });
     const course = await ctx.createCourse({ code: `CRS-${ctx.token}-RETRY` });
     const room = await ctx.createRoom();
@@ -166,7 +218,10 @@ describe.sequential("Waiting room approval invariants", () => {
     const activeCourse = await ctx.createCourse({ code: `CRS-${ctx.token}-ACTIVE` });
     const inactiveCourse = await ctx.createCourse({ code: `CRS-${ctx.token}-INACTIVE` });
     const activeRoom = await ctx.createWaitingRoom({ courseId: activeCourse.id, isActive: true });
-    const inactiveRoom = await ctx.createWaitingRoom({ courseId: inactiveCourse.id, isActive: false });
+    const inactiveRoom = await ctx.createWaitingRoom({
+      courseId: inactiveCourse.id,
+      isActive: false,
+    });
     const activeApproval = await ctx.createApproval({
       waitingRoomId: activeRoom.id,
       status: ApprovalStatus.APPROVED,

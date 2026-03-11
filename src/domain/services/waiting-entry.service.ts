@@ -69,17 +69,17 @@ export const waitingEntryService = {
     ]);
 
     if (!studentProfile?.faculty || !course || course.faculty !== studentProfile.faculty) {
-      throw new Error("Báº¡n chá»‰ cÃ³ thá»ƒ tham gia phÃ²ng chá» cá»§a há»c pháº§n thuá»™c ngÃ nh cá»§a mÃ¬nh");
+      throw new Error("Bạn chỉ có thể tham gia phòng chờ của học phần thuộc ngành của mình");
     }
 
     // Penalty block requirement removed as per user request
 
     const room = await waitingRoomService.evaluateAndActivate(courseId);
     if (!room) {
-      throw new Error("KhÃ´ng tÃ¬m tháº¥y phÃ²ng chá» cho há»c pháº§n");
+      throw new Error("Không tìm thấy phòng chờ cho học phần");
     }
     if (!room.isActive) {
-      throw new Error("PhÃ²ng chá» chÆ°a Ä‘á»§ Ä‘iá»u kiá»‡n kÃ­ch hoáº¡t");
+      throw new Error("Phòng chờ chưa đủ điều kiện kích hoạt");
     }
 
     await assertNoActiveEnrollmentForCourse({
@@ -99,10 +99,10 @@ export const waitingEntryService = {
       select: { id: true },
     });
     if (!waitingSections.length) {
-      throw new Error("ChÆ°a cÃ³ lá»›p bá»• sung kháº£ dá»¥ng cho phÃ²ng chá»");
+      throw new Error("Chưa có lớp bổ sung khả dụng cho phòng chờ");
     }
     if (waitingSections.length !== priorityIds.length) {
-      throw new Error("Nguyá»‡n vá»ng pháº£i lÃ  cÃ¡c lá»›p bá»• sung dÃ nh cho phÃ²ng chá»");
+      throw new Error("Nguyện vọng phải là các lớp bổ sung dành cho phòng chờ");
     }
 
     const existing = await prisma.waitingEntry.findFirst({
@@ -120,7 +120,7 @@ export const waitingEntryService = {
 
     const priorityPenaltyActive = isFutureDate(studentProfile.priorityPenaltyUntil);
     if (priorityPenaltyActive && priorities.length < 2) {
-      throw new Error("Báº¡n Ä‘ang máº¥t quyá»n Æ°u tiÃªn táº¡m thá»i, vui lÃ²ng chá»n Ã­t nháº¥t 2 nguyá»‡n vá»ng");
+      throw new Error("Bạn đang mất quyền ưu tiên tạm thời, vui lòng chọn ít nhất 2 nguyện vọng");
     }
     let entry;
     try {
@@ -132,7 +132,7 @@ export const waitingEntryService = {
           prioritiesJson: priorities as unknown as Prisma.JsonArray,
           state: WaitingEntryState.QUEUED,
           reason: priorityPenaltyActive
-            ? `Äang máº¥t quyá»n Æ°u tiÃªn táº¡m thá»i Ä‘áº¿n ${studentProfile.priorityPenaltyUntil?.toLocaleString("vi-VN")}`
+            ? `Đang mất quyền ưu tiên tạm thời đến ${studentProfile.priorityPenaltyUntil?.toLocaleString("vi-VN")}`
             : null,
         },
       });
@@ -147,10 +147,10 @@ export const waitingEntryService = {
 
     await Promise.all([
       notificationService.create(studentId, "SYSTEM", {
-        title: "ÄÃ£ ghi nháº­n yÃªu cáº§u phÃ²ng chá»",
+        title: "Đã ghi nhận yêu cầu phòng chờ",
         message: priorityPenaltyActive
-          ? `Báº¡n Ä‘Ã£ tham gia phÃ²ng chá» há»c pháº§n ${course.code}. VÃ¬ Ä‘ang máº¥t quyá»n Æ°u tiÃªn táº¡m thá»i, há»‡ thá»‘ng sáº½ bá» qua Æ°u tiÃªn 1 khi matching. Vá»‹ trÃ­ FIFO hiá»‡n táº¡i: #${position}.`
-          : `Báº¡n Ä‘Ã£ tham gia phÃ²ng chá» há»c pháº§n ${course.code}. Vá»‹ trÃ­ FIFO hiá»‡n táº¡i: #${position}.`,
+          ? `Bạn đã tham gia phòng chờ học phần ${course.code}. Vì đang mất quyền ưu tiên tạm thời, hệ thống sẽ bỏ qua ưu tiên 1 khi matching. Vị trí FIFO hiện tại: #${position}.`
+          : `Bạn đã tham gia phòng chờ học phần ${course.code}. Vị trí FIFO hiện tại: #${position}.`,
         waitingEntryId: entry.id,
         waitingRoomId: room.id,
         courseCode: course.code,
@@ -159,8 +159,8 @@ export const waitingEntryService = {
         priorityPenaltyUntil: studentProfile.priorityPenaltyUntil?.toISOString() ?? null,
       }),
       notificationService.createForAdmins("SYSTEM", {
-        title: "CÃ³ yÃªu cáº§u phÃ²ng chá» má»›i",
-        message: `${studentProfile.fullName} (${studentProfile.studentCode}) vá»«a tham gia phÃ²ng chá» há»c pháº§n ${course.code}.`,
+        title: "Có yêu cầu phòng chờ mới",
+        message: `${studentProfile.fullName} (${studentProfile.studentCode}) vừa tham gia phòng chờ học phần ${course.code}.`,
         waitingEntryId: entry.id,
         waitingRoomId: room.id,
         studentId,
@@ -174,8 +174,8 @@ export const waitingEntryService = {
       }),
     ]);
 
-    // Asynchronously trigger matching so students joining an already approved room don't get stuck in QUEUED
-    void matchingService.matchWaitingRoom(room.id).catch(console.error);
+    // Wait for matching to finish so serverless runtimes do not drop the queue processing task.
+    await matchingService.matchWaitingRoom(room.id);
 
     return { room, entry, position };
   },
@@ -262,4 +262,3 @@ export const waitingEntryService = {
     }));
   },
 };
-

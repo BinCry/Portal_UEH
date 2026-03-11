@@ -42,9 +42,10 @@ export async function GET() {
         entries: {
           where: {
             state: {
-              in: [WaitingEntryState.PENDING_ADMIN],
+              in: [WaitingEntryState.QUEUED, WaitingEntryState.PENDING_ADMIN],
             },
           },
+          orderBy: [{ joinedAt: "asc" }, { id: "asc" }],
           select: {
             id: true,
             studentId: true,
@@ -97,16 +98,27 @@ export async function GET() {
           in: rooms.map((room) => room.id),
         },
         state: {
-          in: [WaitingEntryState.QUEUED, WaitingEntryState.PENDING_ADMIN, WaitingEntryState.OFFERED],
+          in: [
+            WaitingEntryState.QUEUED,
+            WaitingEntryState.PENDING_ADMIN,
+            WaitingEntryState.OFFERED,
+          ],
         },
       },
       _count: {
         _all: true,
       },
     });
-    const waitingCountMap = new Map<string, { queued: number; pendingAdmin: number; offered: number }>();
+    const waitingCountMap = new Map<
+      string,
+      { queued: number; pendingAdmin: number; offered: number }
+    >();
     for (const row of waitingCountRows) {
-      const current = waitingCountMap.get(row.waitingRoomId) ?? { queued: 0, pendingAdmin: 0, offered: 0 };
+      const current = waitingCountMap.get(row.waitingRoomId) ?? {
+        queued: 0,
+        pendingAdmin: 0,
+        offered: 0,
+      };
       if (row.state === WaitingEntryState.QUEUED) current.queued = row._count._all;
       if (row.state === WaitingEntryState.PENDING_ADMIN) current.pendingAdmin = row._count._all;
       if (row.state === WaitingEntryState.OFFERED) current.offered = row._count._all;
@@ -116,7 +128,8 @@ export async function GET() {
     return ok(
       rooms.map((room) => {
         const counts = waitingCountMap.get(room.id) ?? { queued: 0, pendingAdmin: 0, offered: 0 };
-        const pendingApproval = room.approvals.find((approval) => approval.status === ApprovalStatus.PENDING) ?? null;
+        const pendingApproval =
+          room.approvals.find((approval) => approval.status === ApprovalStatus.PENDING) ?? null;
         const latestApproval = room.approvals[0] ?? null;
         const roomStatus = deriveWaitingRoomOperationalStatus({
           isActive: room.isActive,
@@ -127,6 +140,12 @@ export async function GET() {
           latestApproval,
           pendingApproval,
         });
+        const queuedEntries = room.entries.filter(
+          (entry) => entry.state === WaitingEntryState.QUEUED,
+        );
+        const pendingEntries = room.entries.filter(
+          (entry) => entry.state === WaitingEntryState.PENDING_ADMIN,
+        );
 
         return {
           ...room,
@@ -139,7 +158,17 @@ export async function GET() {
           isOrphanActive: roomStatus === "ORPHAN_ACTIVE",
           pendingApproval,
           latestApproval,
-          pendingEntries: room.entries.map((entry) => ({
+          queuedEntries: queuedEntries.map((entry, index) => ({
+            id: entry.id,
+            studentId: entry.studentId,
+            studentName: entry.student.studentProfile?.fullName ?? entry.student.email,
+            studentCode: entry.student.studentProfile?.studentCode ?? null,
+            state: entry.state,
+            joinedAt: entry.joinedAt,
+            fifoPosition: index + 1,
+            reason: entry.reason,
+          })),
+          pendingEntries: pendingEntries.map((entry) => ({
             id: entry.id,
             studentId: entry.studentId,
             studentName: entry.student.studentProfile?.fullName ?? entry.student.email,

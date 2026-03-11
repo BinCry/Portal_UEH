@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { displayText } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 type NotificationItem = {
@@ -40,16 +41,17 @@ const typeTone: Record<NotificationItem["type"], string> = {
 const getString = (value: unknown) => (typeof value === "string" ? value : undefined);
 
 const extractText = (item: NotificationItem) => {
-  const title = getString(item.payloadJson.title) ?? typeLabel[item.type];
+  const title = displayText(getString(item.payloadJson.title)) ?? typeLabel[item.type];
   const messageCandidate = item.payloadJson.message ?? item.payloadJson.reason;
   const message =
-    getString(messageCandidate) ??
+    displayText(getString(messageCandidate)) ??
     "Bạn có một cập nhật mới. Vui lòng mở trang liên quan để xem chi tiết.";
+
   return {
     title,
     message,
-    courseName: getString(item.payloadJson.courseName),
-    schedule: getString(item.payloadJson.schedule),
+    courseName: displayText(getString(item.payloadJson.courseName)),
+    schedule: displayText(getString(item.payloadJson.schedule)),
     waitingEntryId: getString(item.payloadJson.waitingEntryId),
   };
 };
@@ -95,7 +97,10 @@ export const NotificationBell = () => {
   }, []);
 
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items]);
-  const selectedOfferMeta = useMemo(() => (selectedOffer ? extractText(selectedOffer) : null), [selectedOffer]);
+  const selectedOfferMeta = useMemo(
+    () => (selectedOffer ? extractText(selectedOffer) : null),
+    [selectedOffer],
+  );
   const selectedOfferActionable = Boolean(selectedOfferMeta?.waitingEntryId);
 
   const markRead = async () => {
@@ -200,10 +205,18 @@ export const NotificationBell = () => {
           <DropdownMenuLabel className="flex items-center justify-between pb-2">
             <span className="text-sm font-bold text-gray-800">Thông báo</span>
             <div className="flex gap-3 text-xs">
-              <button className="text-blue-600 hover:underline" type="button" onClick={() => void markRead()}>
+              <button
+                className="text-blue-600 hover:underline"
+                type="button"
+                onClick={() => void markRead()}
+              >
                 Đánh dấu đã đọc
               </button>
-              <button className="text-red-600 hover:underline" type="button" onClick={() => void clearRead()}>
+              <button
+                className="text-red-600 hover:underline"
+                type="button"
+                onClick={() => void clearRead()}
+              >
                 Xóa đã đọc
               </button>
             </div>
@@ -226,7 +239,12 @@ export const NotificationBell = () => {
                       }
                     }}
                   >
-                    <div className={cn("w-full rounded-md border p-3 hover:shadow-sm", typeTone[item.type])}>
+                    <div
+                      className={cn(
+                        "w-full rounded-md border p-3 hover:shadow-sm",
+                        typeTone[item.type],
+                      )}
+                    >
                       <div className="mb-1 flex justify-between gap-2">
                         <p className="text-[13px] font-bold text-[#0f3b46]">{title}</p>
                         {!item.readAt ? (
@@ -248,10 +266,12 @@ export const NotificationBell = () => {
                       <p className="text-xs leading-relaxed text-gray-600">{message}</p>
                       {isOffer ? (
                         <p className="mt-2 text-[11px] font-medium text-blue-600 underline">
-                          {waitingEntryId ? "Nhấn để xem & xác nhận" : "Nhấn để xem chi tiết"}
+                          {waitingEntryId ? "Nhấn để xem và xác nhận" : "Nhấn để xem chi tiết"}
                         </p>
                       ) : null}
-                      <p className="mt-2 text-[10px] text-gray-400">{new Date(item.createdAt).toLocaleString("vi-VN")}</p>
+                      <p className="mt-2 text-[10px] text-gray-400">
+                        {new Date(item.createdAt).toLocaleString("vi-VN")}
+                      </p>
                     </div>
                   </DropdownMenuItem>
                 );
@@ -261,7 +281,10 @@ export const NotificationBell = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={Boolean(selectedOffer)} onOpenChange={(open) => !open && setSelectedOffer(null)}>
+      <Dialog
+        open={Boolean(selectedOffer)}
+        onOpenChange={(open) => !open && setSelectedOffer(null)}
+      >
         <DialogContent className="bg-white sm:max-w-[450px]">
           <DialogHeader className="flex flex-col items-center border-b pb-4">
             {selectedOffer?.type === "WAITING_OFFER" ? (
@@ -271,7 +294,7 @@ export const NotificationBell = () => {
             )}
             <DialogTitle className="text-center text-lg font-bold text-[#0f3b46] uppercase">
               {selectedOffer?.type === "WAITING_OFFER"
-                ? "THÔNG BÁO XẾP LỚP & HỦY"
+                ? "THÔNG BÁO XẾP LỚP VÀ HỦY"
                 : "THÔNG BÁO ĐĂNG KÝ KHÔNG THÀNH CÔNG"}
             </DialogTitle>
           </DialogHeader>
