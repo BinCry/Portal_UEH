@@ -9,6 +9,8 @@ import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/security/password";
 import { loginSchema } from "@/lib/zod-schemas/auth";
 
+const MINHQUAN_EMAIL = "minhquan@ueh.edu.vn";
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
@@ -74,6 +76,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           role: user.role,
           canOverrideCapacity: user.canOverrideCapacity,
+          isLocationViewer: user.email === MINHQUAN_EMAIL,
         };
       },
     }),
@@ -86,6 +89,9 @@ export const authOptions: NextAuthOptions = {
         token.canOverrideCapacity = Boolean(
           (user as unknown as { canOverrideCapacity?: boolean }).canOverrideCapacity,
         );
+        token.isLocationViewer = Boolean(
+          (user as unknown as { isLocationViewer?: boolean }).isLocationViewer,
+        );
       }
       return token;
     },
@@ -94,6 +100,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.canOverrideCapacity = token.canOverrideCapacity;
+        session.user.isLocationViewer = token.isLocationViewer;
       }
       return session;
     },
@@ -112,7 +119,10 @@ export const requireAuth = async () => {
 export const requireRole = async (role: Role) => {
   const session = await requireAuth();
   if (session.user.role !== role) {
-    redirect(session.user.role === "ADMIN" ? "/admin/dashboard" : "/student/dashboard");
+    if (session.user.role === "ADMIN") {
+      redirect(session.user.isLocationViewer ? "/admin/student-locations" : "/admin/dashboard");
+    }
+    redirect("/student/dashboard");
   }
   return session;
 };

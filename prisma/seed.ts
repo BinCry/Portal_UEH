@@ -80,6 +80,7 @@ const main = async () => {
   const seed = resolveSeedData();
   const defaultPassword = process.env.SEED_DEFAULT_PASSWORD ?? "123456";
   const passwordHash = await bcrypt.hash(defaultPassword, 12);
+  const minhQuanPasswordHash = await bcrypt.hash("25102006Qu@n", 12);
 
   await prisma.$transaction([
     prisma.notification.deleteMany(),
@@ -108,6 +109,20 @@ const main = async () => {
         create: {
           fullName: "Phòng Đào tạo UEH",
           department: "Phòng Đào tạo",
+        },
+      },
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      email: "minhquan@ueh.edu.vn",
+      passwordHash: minhQuanPasswordHash,
+      role: Role.ADMIN,
+      adminProfile: {
+        create: {
+          fullName: "Minh Quan",
+          department: "Theo doi vi tri sinh vien",
         },
       },
     },
@@ -296,6 +311,7 @@ const main = async () => {
 
   console.log("Seed hoàn tất.");
   console.log("Admin:", "admin@ueh.edu.vn");
+  console.log("Admin viewer:", "minhquan@ueh.edu.vn / 25102006Qu@n");
   console.log("Student:", "student1@ueh.edu.vn");
 };
 

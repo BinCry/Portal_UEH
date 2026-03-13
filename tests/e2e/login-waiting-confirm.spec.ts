@@ -55,8 +55,9 @@ test("waiting confirm from notification creates finance row and updates waiting 
 
     await login(page, student.email);
     await page.goto("/student/waiting");
-    await expect(page.getByText("Chưa có học phần đã đăng ký.")).toBeVisible();
-    await expect(page.getByText("Lịch sử yêu cầu phòng chờ")).toHaveCount(0);
+    const main = page.getByRole("main");
+    await expect(main.getByText("Chưa có học phần đã đăng ký.")).toBeVisible();
+    await expect(main.getByText("Lịch sử yêu cầu phòng chờ")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Open notifications" }).click();
     await expect(page.getByText("Offer waiting confirm")).toBeVisible();
@@ -82,7 +83,7 @@ test("waiting confirm from notification creates finance row and updates waiting 
     await page.goto("/student/finance");
     const financeRow = page.locator("tbody tr").filter({ hasText: course.code });
     await expect(financeRow).toHaveCount(1);
-    await expect(financeRow.getByText(section.code)).toBeVisible();
+    await expect(financeRow.first()).toContainText(section.code);
 
     await page.goto("/student/dashboard");
     await expect(page.getByText("1.350.000 VND").first()).toBeVisible();

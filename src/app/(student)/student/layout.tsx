@@ -1,4 +1,5 @@
-﻿import { PortalShell } from "@/components/layout/portal-shell";
+import { PortalShell } from "@/components/layout/portal-shell";
+import { StudentLocationTracker } from "@/components/student/student-location-tracker";
 import { requireRole } from "@/lib/auth";
 
 const studentNav = [
@@ -10,8 +11,10 @@ const studentNav = [
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   await requireRole("STUDENT");
+
   return (
     <PortalShell title="Sinh viên" subtitle="Cổng đăng ký học phần thông minh" nav={studentNav}>
+      <StudentLocationTracker />
       {children}
     </PortalShell>
   );

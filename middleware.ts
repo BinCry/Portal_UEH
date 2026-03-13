@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import NextAuth from "next-auth";
 
 const studentPaths = ["/student"];
 const adminPaths = ["/admin"];
@@ -28,12 +27,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  const adminLandingPath = token.isLocationViewer ? "/admin/student-locations" : "/admin/dashboard";
+
   if (pathname.startsWith("/admin") && token.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/student/dashboard", request.url));
   }
 
   if (pathname.startsWith("/student") && token.role !== "STUDENT") {
-    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    return NextResponse.redirect(new URL(adminLandingPath, request.url));
   }
 
   return NextResponse.next();
