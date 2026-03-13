@@ -32,6 +32,16 @@ test("direct register updates finance page and dashboard, then cancel removes bo
       page.locator("button.bg-blue-600").click(),
     ]);
 
+    await page.goto("/student/waiting");
+    await expect(page.getByRole("columnheader", { name: "Sĩ số" })).toBeVisible();
+    const waitingHistoryRow = page
+      .locator("tbody tr")
+      .filter({ hasText: course.code })
+      .filter({ hasText: "Đăng ký trực tiếp" })
+      .first();
+    await expect(waitingHistoryRow).toBeVisible();
+    await expect(waitingHistoryRow.locator("td").nth(4)).toHaveText("1");
+
     await page.goto("/student/finance");
     const financeRow = page.locator("tbody tr").filter({ hasText: course.code }).first();
     await expect(financeRow).toBeVisible();

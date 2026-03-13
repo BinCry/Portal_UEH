@@ -1,8 +1,12 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatSectionScheduleSummary } from "@/lib/section-display";
+import {
+  STUDENT_REGISTRATION_UPDATED_EVENT,
+  emitStudentRegistrationUpdated,
+} from "@/lib/student-registration-events";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -43,6 +47,8 @@ type WaitingItem = {
 type EnrollmentItem = {
   id: string;
   source: "WAITING_ROOM" | "DIRECT";
+  participantCount: number;
+  participantScope: "SECTION" | "WAITING_FLOW";
   createdAt: string;
   section: {
     id?: string;
@@ -82,6 +88,9 @@ type CancelEnrollmentPayload = {
 
 const sourceLabel = (source: EnrollmentItem["source"]) =>
   source === "WAITING_ROOM" ? "Qua phòng chờ" : "Đăng ký trực tiếp";
+
+const participantCountLabel = (item: EnrollmentItem) =>
+  item.participantScope === "WAITING_FLOW" ? `${item.participantCount} (phòng chờ)` : String(item.participantCount);
 
 const waitingStateLabel: Record<WaitingItem["state"], string> = {
   QUEUED: "Đang chờ",
@@ -147,74 +156,43 @@ export const WaitingHistory = () => {
   };
 
   useEffect(() => {
+    const handleRegistrationUpdated = () => {
+      void load();
+    };
+
     void load();
+    window.addEventListener(STUDENT_REGISTRATION_UPDATED_EVENT, handleRegistrationUpdated);
+    return () => {
+      window.removeEventListener(STUDENT_REGISTRATION_UPDATED_EVENT, handleRegistrationUpdated);
+    };
   }, []);
 
   const action = async (type: "confirm" | "decline", waitingEntryId: string) => {
     const target = waitingItems.find((item) => item.id === waitingEntryId);
     if (!target) return;
 
-    const previousWaitingItems = waitingItems;
-    const previousEnrollments = enrollments;
-    const optimisticState = type === "confirm" ? "CONFIRMED" : "DECLINED";
     setActionLoadingId(waitingEntryId);
-    setWaitingItems((current) =>
-      current.map((item) =>
-        item.id === waitingEntryId
-          ? {
-            ...item,
-            state: optimisticState,
-            reason: type === "confirm" ? "Đã xác nhận (đang đồng bộ...)" : "Đã từ chối (đang đồng bộ...)",
-          }
-          : item,
-      ),
-    );
 
-    if (type === "confirm" && target.offerSection) {
-      const optimisticEnrollment: EnrollmentItem = {
-        id: `optimistic-${waitingEntryId}`,
-        source: "WAITING_ROOM",
-        createdAt: new Date().toISOString(),
-        section: {
-          code: target.offerSection.code,
-          dayOfWeek: target.offerSection.dayOfWeek,
-          startDate: target.offerSection.startDate,
-          endDate: target.offerSection.endDate,
-          course: {
-            code: target.waitingRoom.course.code,
-            name: target.waitingRoom.course.name,
-          },
-          room: {
-            campus: target.offerSection.room.campus,
-            code: target.offerSection.room.code,
-            address: target.offerSection.room.address,
-          },
-          timeSlot: {
-            label: target.offerSection.timeSlot.label,
-            startTime: target.offerSection.timeSlot.startTime,
-            endTime: target.offerSection.timeSlot.endTime,
-          },
-        },
-      };
-      setEnrollments((current) => [optimisticEnrollment, ...current]);
+    try {
+      const response = await fetch(`/api/waiting/${type}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ waitingEntryId }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok || !payload.success) {
+        toast.error(payload.error?.message ?? "Không thể xử lý");
+        return;
+      }
+
+      toast.success(type === "confirm" ? "Đã xác nhận tham gia" : "Đã từ chối đề xuất");
+      emitStudentRegistrationUpdated();
+    } catch {
+      toast.error("Không thể kết nối tới máy chủ");
+    } finally {
+      setActionLoadingId(null);
     }
-
-    const response = await fetch(`/api/waiting/${type}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ waitingEntryId }),
-    });
-    const payload = await response.json();
-    setActionLoadingId(null);
-
-    if (!response.ok || !payload.success) {
-      setWaitingItems(previousWaitingItems);
-      setEnrollments(previousEnrollments);
-      toast.error(payload.error?.message ?? "Không thể xử lý");
-      return;
-    }
-    toast.success(type === "confirm" ? "Đã xác nhận tham gia" : "Đã từ chối đề xuất");
-    await load();
   };
 
   const cancelEnrollment = async () => {
@@ -241,7 +219,7 @@ export const WaitingHistory = () => {
       }
 
       setCancelTarget(null);
-      await load();
+      emitStudentRegistrationUpdated();
     } catch {
       toast.error("Không thể kết nối tới máy chủ");
     } finally {
@@ -256,6 +234,7 @@ export const WaitingHistory = () => {
         { label: "Lớp học phần", value: item.section.code },
         { label: "Lịch học & địa chỉ", value: formatScheduleFromEnrollment(item) },
         { label: "Nguồn đăng ký", value: sourceLabel(item.source) },
+        { label: "Sĩ số", value: participantCountLabel(item) },
       ],
     });
   };
@@ -296,13 +275,14 @@ export const WaitingHistory = () => {
         {enrollments.length === 0 ? (
           <p className="text-muted-foreground text-sm">Chưa có học phần đã đăng ký.</p>
         ) : (
-          <Table className="min-w-[1120px] table-fixed">
+          <Table className="min-w-[1240px] table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[260px]">Học phần</TableHead>
+                <TableHead className="w-[250px]">Học phần</TableHead>
                 <TableHead className="w-[170px]">LHP</TableHead>
-                <TableHead className="w-[430px]">Lịch học & địa chỉ</TableHead>
+                <TableHead className="w-[420px]">Lịch học & địa chỉ</TableHead>
                 <TableHead className="w-[160px]">Nguồn đăng ký</TableHead>
+                <TableHead className="w-[90px] text-center">Sĩ số</TableHead>
                 <TableHead className="w-[150px] text-right">Hành động</TableHead>
               </TableRow>
             </TableHeader>
@@ -316,16 +296,17 @@ export const WaitingHistory = () => {
                     </button>
                   </TableCell>
                   <TableCell className="align-top">{item.section.code}</TableCell>
-                  <TableCell className="max-w-[430px] align-top whitespace-normal break-words text-sm leading-relaxed">
+                  <TableCell className="max-w-[420px] align-top whitespace-normal break-words text-sm leading-relaxed">
                     {formatScheduleFromEnrollment(item)}
                   </TableCell>
                   <TableCell className="align-top">
                     <Badge variant={item.source === "WAITING_ROOM" ? "default" : "secondary"}>{sourceLabel(item.source)}</Badge>
                   </TableCell>
+                  <TableCell className="align-top text-center font-sans tabular-nums">{item.participantCount}</TableCell>
                   <TableCell className="align-top text-right">
                     <Button
                       variant="outline"
-                      className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 whitespace-nowrap"
+                      className="border-red-200 whitespace-nowrap text-red-700 hover:bg-red-50 hover:text-red-800"
                       onClick={() => setCancelTarget(item)}
                       disabled={cancelLoadingId === item.id}
                     >

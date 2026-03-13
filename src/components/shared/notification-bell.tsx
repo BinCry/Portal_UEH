@@ -14,6 +14,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { displayText } from "@/lib/text";
+import {
+  STUDENT_REGISTRATION_UPDATED_EVENT,
+  emitStudentRegistrationUpdated,
+} from "@/lib/student-registration-events";
 import { cn } from "@/lib/utils";
 
 type NotificationItem = {
@@ -87,20 +91,26 @@ export const NotificationBell = () => {
   };
 
   useEffect(() => {
+    const handleRegistrationUpdated = () => {
+      void load();
+    };
+
     void load();
+    window.addEventListener(STUDENT_REGISTRATION_UPDATED_EVENT, handleRegistrationUpdated);
     const id = window.setInterval(() => {
       if (!document.hidden) {
         void load();
       }
     }, 60_000);
-    return () => window.clearInterval(id);
+
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener(STUDENT_REGISTRATION_UPDATED_EVENT, handleRegistrationUpdated);
+    };
   }, []);
 
   const unreadCount = useMemo(() => items.filter((item) => !item.readAt).length, [items]);
-  const selectedOfferMeta = useMemo(
-    () => (selectedOffer ? extractText(selectedOffer) : null),
-    [selectedOffer],
-  );
+  const selectedOfferMeta = useMemo(() => (selectedOffer ? extractText(selectedOffer) : null), [selectedOffer]);
   const selectedOfferActionable = Boolean(selectedOfferMeta?.waitingEntryId);
 
   const markRead = async () => {
@@ -180,7 +190,7 @@ export const NotificationBell = () => {
 
       toast.success(action === "confirm" ? "Đã xác nhận lớp" : "Đã hủy lớp");
       setSelectedOffer(null);
-      await load();
+      emitStudentRegistrationUpdated();
     } catch {
       toast.error("Không thể kết nối tới máy chủ");
     } finally {
@@ -192,7 +202,12 @@ export const NotificationBell = () => {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="relative bg-white hover:bg-gray-100">
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Open notifications"
+            className="relative bg-white hover:bg-gray-100"
+          >
             <Bell className="size-5 text-gray-700" />
             {unreadCount > 0 ? (
               <span className="absolute -top-1.5 -right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full border-2 border-white bg-red-600 text-[10px] font-bold text-white">
@@ -205,18 +220,10 @@ export const NotificationBell = () => {
           <DropdownMenuLabel className="flex items-center justify-between pb-2">
             <span className="text-sm font-bold text-gray-800">Thông báo</span>
             <div className="flex gap-3 text-xs">
-              <button
-                className="text-blue-600 hover:underline"
-                type="button"
-                onClick={() => void markRead()}
-              >
+              <button className="text-blue-600 hover:underline" type="button" onClick={() => void markRead()}>
                 Đánh dấu đã đọc
               </button>
-              <button
-                className="text-red-600 hover:underline"
-                type="button"
-                onClick={() => void clearRead()}
-              >
+              <button className="text-red-600 hover:underline" type="button" onClick={() => void clearRead()}>
                 Xóa đã đọc
               </button>
             </div>
@@ -239,12 +246,7 @@ export const NotificationBell = () => {
                       }
                     }}
                   >
-                    <div
-                      className={cn(
-                        "w-full rounded-md border p-3 hover:shadow-sm",
-                        typeTone[item.type],
-                      )}
-                    >
+                    <div className={cn("w-full rounded-md border p-3 hover:shadow-sm", typeTone[item.type])}>
                       <div className="mb-1 flex justify-between gap-2">
                         <p className="text-[13px] font-bold text-[#0f3b46]">{title}</p>
                         {!item.readAt ? (
@@ -269,9 +271,7 @@ export const NotificationBell = () => {
                           {waitingEntryId ? "Nhấn để xem và xác nhận" : "Nhấn để xem chi tiết"}
                         </p>
                       ) : null}
-                      <p className="mt-2 text-[10px] text-gray-400">
-                        {new Date(item.createdAt).toLocaleString("vi-VN")}
-                      </p>
+                      <p className="mt-2 text-[10px] text-gray-400">{new Date(item.createdAt).toLocaleString("vi-VN")}</p>
                     </div>
                   </DropdownMenuItem>
                 );
@@ -281,10 +281,7 @@ export const NotificationBell = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog
-        open={Boolean(selectedOffer)}
-        onOpenChange={(open) => !open && setSelectedOffer(null)}
-      >
+      <Dialog open={Boolean(selectedOffer)} onOpenChange={(open) => !open && setSelectedOffer(null)}>
         <DialogContent className="bg-white sm:max-w-[450px]">
           <DialogHeader className="flex flex-col items-center border-b pb-4">
             {selectedOffer?.type === "WAITING_OFFER" ? (
@@ -292,7 +289,7 @@ export const NotificationBell = () => {
             ) : (
               <AlertTriangle className="mb-2 size-12 text-amber-500" />
             )}
-            <DialogTitle className="text-center text-lg font-bold text-[#0f3b46] uppercase">
+            <DialogTitle className="text-center text-lg font-bold uppercase text-[#0f3b46]">
               {selectedOffer?.type === "WAITING_OFFER"
                 ? "THÔNG BÁO XẾP LỚP VÀ HỦY"
                 : "THÔNG BÁO ĐĂNG KÝ KHÔNG THÀNH CÔNG"}
@@ -335,6 +332,7 @@ export const NotificationBell = () => {
               <>
                 <Button
                   className="flex-1 bg-blue-600 text-white hover:bg-blue-700"
+                  aria-label="Confirm waiting offer"
                   onClick={() => void handleOfferAction("confirm")}
                   disabled={isProcessingOffer}
                 >
@@ -344,6 +342,7 @@ export const NotificationBell = () => {
                 <Button
                   variant="destructive"
                   className="flex-1 bg-red-600 text-white hover:bg-red-700"
+                  aria-label="Decline waiting offer"
                   onClick={() => void handleOfferAction("decline")}
                   disabled={isProcessingOffer}
                 >
