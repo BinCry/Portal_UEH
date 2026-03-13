@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { WaitingEntryState } from "@prisma/client";
+import { NotificationType } from "@prisma/client";
+import { prisma } from "../../src/lib/prisma";
 import { createTestDbContext, makePrefix } from "../support/db-fixtures";
 import { login } from "./helpers/auth";
 
-test("waiting confirm creates finance row for the offered section", async ({ page }) => {
+test("waiting confirm from notification creates finance row and updates waiting page", async ({ page }) => {
   const ctx = createTestDbContext(makePrefix("pw-waiting-confirm"));
 
   try {
@@ -23,8 +24,7 @@ test("waiting confirm creates finance row for the offered section", async ({ pag
     const waitingRoom = await ctx.createWaitingRoom({
       courseId: course.id,
     });
-
-    await ctx.createWaitingEntry({
+    const waitingEntry = await ctx.createWaitingEntry({
       waitingRoomId: waitingRoom.id,
       studentId: student.id,
       offerSectionId: section.id,
@@ -33,24 +33,41 @@ test("waiting confirm creates finance row for the offered section", async ({ pag
     await ctx.createWaitingEntry({
       waitingRoomId: waitingRoom.id,
       studentId: queuedStudent.id,
-      state: WaitingEntryState.QUEUED,
+      state: "QUEUED",
       offerSectionId: null,
       prioritiesJson: [{ sectionId: section.id }],
       expiresAt: null,
     });
 
+    await prisma.notification.create({
+      data: {
+        userId: student.id,
+        type: NotificationType.WAITING_OFFER,
+        payloadJson: {
+          title: "Offer waiting confirm",
+          message: "Confirm this waiting offer",
+          waitingEntryId: waitingEntry.id,
+          waitingRoomId: waitingRoom.id,
+          courseName: course.name,
+        },
+      },
+    });
+
     await login(page, student.email);
     await page.goto("/student/waiting");
+    await expect(page.getByText("Chưa có học phần đã đăng ký.")).toBeVisible();
+    await expect(page.getByText("Lịch sử yêu cầu phòng chờ")).toHaveCount(0);
 
-    const actionRow = page
-      .locator("tbody tr")
-      .filter({ hasText: course.code })
-      .filter({ has: page.getByRole("button", { name: /Xác nhận/i }) });
-    await expect(actionRow).toHaveCount(1);
+    await page.getByRole("button", { name: "Open notifications" }).click();
+    await expect(page.getByText("Offer waiting confirm")).toBeVisible();
+    await page.getByText("Offer waiting confirm").click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
 
     await Promise.all([
       page.waitForResponse((response) => response.url().includes("/api/waiting/confirm") && response.ok()),
-      actionRow.getByRole("button", { name: /Xác nhận/i }).click(),
+      dialog.getByRole("button", { name: "Confirm waiting offer" }).click(),
     ]);
 
     await expect(page.getByRole("columnheader", { name: "Sĩ số" })).toBeVisible();

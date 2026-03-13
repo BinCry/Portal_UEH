@@ -44,12 +44,8 @@ test("notification bell confirm refreshes the open waiting page", async ({ page 
 
     await login(page, student.email);
     await page.goto("/student/waiting");
-
-    const actionRow = page
-      .locator("tbody tr")
-      .filter({ hasText: course.code })
-      .filter({ has: page.getByRole("button", { name: /Xác nhận/i }) });
-    await expect(actionRow).toHaveCount(1);
+    await expect(page.getByText("Chưa có học phần đã đăng ký.")).toBeVisible();
+    await expect(page.getByText("Lịch sử yêu cầu phòng chờ")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Open notifications" }).click();
     await expect(page.getByText("Offer sync")).toBeVisible();
@@ -70,12 +66,6 @@ test("notification bell confirm refreshes the open waiting page", async ({ page 
       .first();
     await expect(enrolledRow).toBeVisible();
     await expect(enrolledRow.locator("td").nth(4)).toHaveText("1");
-    await expect(
-      page
-        .locator("tbody tr")
-        .filter({ hasText: course.code })
-        .filter({ has: page.getByRole("button", { name: /Xác nhận/i }) }),
-    ).toHaveCount(0);
   } finally {
     await ctx.cleanup();
   }

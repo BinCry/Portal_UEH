@@ -12,38 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-type WaitingItem = {
-  id: string;
-  state: "QUEUED" | "PENDING_ADMIN" | "OFFERED" | "CONFIRMED" | "DECLINED" | "EXPIRED" | "FAILED" | "DEFERRED";
-  joinedAt: string;
-  expiresAt: string | null;
-  fifoPosition: number | null;
-  matchedPriority: number | null;
-  reason: string | null;
-  waitingRoom: {
-    course: {
-      code: string;
-      name: string;
-    };
-  };
-  offerSection: {
-    code: string;
-    dayOfWeek: string;
-    startDate?: string | null;
-    endDate?: string | null;
-    room: {
-      campus: string | null;
-      code: string;
-      address: string | null;
-    };
-    timeSlot: {
-      label: string;
-      startTime: string;
-      endTime: string;
-    };
-  } | null;
-};
-
 type EnrollmentItem = {
   id: string;
   source: "WAITING_ROOM" | "DIRECT";
@@ -92,17 +60,6 @@ const sourceLabel = (source: EnrollmentItem["source"]) =>
 const participantCountLabel = (item: EnrollmentItem) =>
   item.participantScope === "WAITING_FLOW" ? `${item.participantCount} (phòng chờ)` : String(item.participantCount);
 
-const waitingStateLabel: Record<WaitingItem["state"], string> = {
-  QUEUED: "Đang chờ",
-  PENDING_ADMIN: "Chờ admin duyệt",
-  OFFERED: "Đã được giữ chỗ",
-  CONFIRMED: "Đã xác nhận",
-  DECLINED: "Đã từ chối",
-  EXPIRED: "Hết hạn",
-  FAILED: "Không khớp lịch",
-  DEFERRED: "Tạm hoãn",
-};
-
 const formatScheduleFromEnrollment = (item: EnrollmentItem) =>
   formatSectionScheduleSummary({
     dayOfWeek: item.section.dayOfWeek,
@@ -115,25 +72,9 @@ const formatScheduleFromEnrollment = (item: EnrollmentItem) =>
     roomCode: item.section.room.code,
   });
 
-const formatScheduleFromWaiting = (item: WaitingItem) => {
-  if (!item.offerSection) return "Đang cập nhật";
-  return formatSectionScheduleSummary({
-    dayOfWeek: item.offerSection.dayOfWeek,
-    startTime: item.offerSection.timeSlot.startTime,
-    endTime: item.offerSection.timeSlot.endTime,
-    startDate: item.offerSection.startDate,
-    endDate: item.offerSection.endDate,
-    address: item.offerSection.room.address,
-    campus: item.offerSection.room.campus,
-    roomCode: item.offerSection.room.code,
-  });
-};
-
 export const WaitingHistory = () => {
-  const [waitingItems, setWaitingItems] = useState<WaitingItem[]>([]);
   const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [cancelLoadingId, setCancelLoadingId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<EnrollmentItem | null>(null);
   const [detail, setDetail] = useState<{ title: string; rows: Array<{ label: string; value: string }> } | null>(null);
@@ -141,14 +82,11 @@ export const WaitingHistory = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const [waitingRes, enrollmentsRes] = await Promise.all([fetch("/api/waiting/me"), fetch("/api/enrollments/me")]);
-      const [waitingPayload, enrollmentsPayload] = await Promise.all([waitingRes.json(), enrollmentsRes.json()]);
+      const response = await fetch("/api/enrollments/me");
+      const payload = await response.json();
 
-      if (waitingPayload.success) {
-        setWaitingItems(waitingPayload.data);
-      }
-      if (enrollmentsPayload.success) {
-        setEnrollments(enrollmentsPayload.data);
+      if (payload.success) {
+        setEnrollments(payload.data);
       }
     } finally {
       setLoading(false);
@@ -166,34 +104,6 @@ export const WaitingHistory = () => {
       window.removeEventListener(STUDENT_REGISTRATION_UPDATED_EVENT, handleRegistrationUpdated);
     };
   }, []);
-
-  const action = async (type: "confirm" | "decline", waitingEntryId: string) => {
-    const target = waitingItems.find((item) => item.id === waitingEntryId);
-    if (!target) return;
-
-    setActionLoadingId(waitingEntryId);
-
-    try {
-      const response = await fetch(`/api/waiting/${type}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ waitingEntryId }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok || !payload.success) {
-        toast.error(payload.error?.message ?? "Không thể xử lý");
-        return;
-      }
-
-      toast.success(type === "confirm" ? "Đã xác nhận tham gia" : "Đã từ chối đề xuất");
-      emitStudentRegistrationUpdated();
-    } catch {
-      toast.error("Không thể kết nối tới máy chủ");
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
 
   const cancelEnrollment = async () => {
     if (!cancelTarget) return;
@@ -239,42 +149,18 @@ export const WaitingHistory = () => {
     });
   };
 
-  const openWaitingDetail = (item: WaitingItem) => {
-    if (!item.offerSection) {
-      setDetail({
-        title: `${item.waitingRoom.course.code} - ${item.waitingRoom.course.name}`,
-        rows: [
-          { label: "Trạng thái", value: waitingStateLabel[item.state] },
-          { label: "Ưu tiên khớp", value: item.matchedPriority ? `P${item.matchedPriority}` : "-" },
-          { label: "Lý do", value: item.reason ?? "Đang chờ xử lý" },
-        ],
-      });
-      return;
-    }
-
-    setDetail({
-      title: `${item.waitingRoom.course.code} - ${item.waitingRoom.course.name}`,
-      rows: [
-        { label: "Lớp đề xuất", value: item.offerSection.code },
-        { label: "Lịch học & địa chỉ", value: formatScheduleFromWaiting(item) },
-        { label: "Trạng thái", value: waitingStateLabel[item.state] },
-        { label: "Ưu tiên khớp", value: item.matchedPriority ? `P${item.matchedPriority}` : "-" },
-      ],
-    });
-  };
-
   if (loading) return <p className="text-sm">Đang tải dữ liệu...</p>;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-base font-semibold">Môn đã đăng ký</h3>
-          <Badge variant="outline">{enrollments.length} môn</Badge>
-        </div>
-        {enrollments.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Chưa có học phần đã đăng ký.</p>
-        ) : (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-base font-semibold">Môn đã đăng ký</h3>
+        <Badge variant="outline">{enrollments.length} môn</Badge>
+      </div>
+      {enrollments.length === 0 ? (
+        <p className="text-muted-foreground text-sm">Chưa có học phần đã đăng ký.</p>
+      ) : (
+        <div className="pb-2">
           <Table className="min-w-[1240px] table-fixed">
             <TableHeader>
               <TableRow>
@@ -317,71 +203,8 @@ export const WaitingHistory = () => {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
-
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-base font-semibold">Lịch sử yêu cầu phòng chờ</h3>
-          <Badge variant="outline">{waitingItems.length} yêu cầu</Badge>
         </div>
-        {waitingItems.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Chưa có lịch sử phòng chờ.</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Học phần</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Vị trí FIFO</TableHead>
-                <TableHead>Offer</TableHead>
-                <TableHead>Ưu tiên khớp</TableHead>
-                <TableHead>Lý do/Ghi chú</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {waitingItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <button className="text-left hover:underline" type="button" onClick={() => openWaitingDetail(item)}>
-                      <p className="font-medium">{item.waitingRoom.course.code}</p>
-                      <p className="text-muted-foreground text-xs">{item.waitingRoom.course.name}</p>
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <Badge>{waitingStateLabel[item.state]}</Badge>
-                  </TableCell>
-                  <TableCell>{item.fifoPosition ? `#${item.fifoPosition}` : "-"}</TableCell>
-                  <TableCell>{item.offerSection?.code ?? "-"}</TableCell>
-                  <TableCell>{item.matchedPriority ? `P${item.matchedPriority}` : "-"}</TableCell>
-                  <TableCell>{item.reason ?? "-"}</TableCell>
-                  <TableCell className="space-x-2 text-right">
-                    {item.state === "OFFERED" ? (
-                      <>
-                        <Button
-                          className="primary-glow"
-                          onClick={() => void action("confirm", item.id)}
-                          disabled={actionLoadingId === item.id}
-                        >
-                          Xác nhận
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => void action("decline", item.id)}
-                          disabled={actionLoadingId === item.id}
-                        >
-                          Từ chối
-                        </Button>
-                      </>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+      )}
 
       <Dialog open={Boolean(detail)} onOpenChange={(open) => !open && setDetail(null)}>
         <DialogContent className="glass-card sm:max-w-lg">

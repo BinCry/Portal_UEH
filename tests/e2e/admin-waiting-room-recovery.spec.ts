@@ -3,7 +3,7 @@ import { WaitingEntryState } from "@prisma/client";
 import { createTestDbContext, makePrefix } from "../support/db-fixtures";
 import { login, loginAdmin } from "./helpers/auth";
 
-test("admin recovers orphan waiting room, approves entry, and student confirms the offer", async ({
+test("admin recovers orphan waiting room, approves entry, and student confirms the offer from notifications", async ({
   browser,
 }) => {
   const ctx = createTestDbContext(makePrefix("pw-admin-recovery"));
@@ -52,8 +52,7 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
 
     await Promise.all([
       adminPage.waitForResponse(
-        (response) =>
-          response.url().includes(`/api/admin/waiting/${waitingRoom.id}/approve`) && response.ok(),
+        (response) => response.url().includes(`/api/admin/waiting/${waitingRoom.id}/approve`) && response.ok(),
       ),
       roomRow.getByRole("button", { name: /Phê duyệt room/i }).click(),
     ]);
@@ -68,9 +67,7 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
 
     await Promise.all([
       adminPage.waitForResponse(
-        (response) =>
-          response.url().includes(`/api/admin/waiting/entries/${waitingEntry.id}/approve`) &&
-          response.ok(),
+        (response) => response.url().includes(`/api/admin/waiting/entries/${waitingEntry.id}/approve`) && response.ok(),
       ),
       entryRow.getByRole("button", { name: /Duyệt entry/i }).click(),
     ]);
@@ -79,19 +76,27 @@ test("admin recovers orphan waiting room, approves entry, and student confirms t
     const studentPage = await studentContext.newPage();
     await login(studentPage, student.email);
     await studentPage.goto("/student/waiting");
+    await expect(studentPage.getByText("Chưa có học phần đã đăng ký.")).toBeVisible();
+    await expect(studentPage.getByText("Lịch sử yêu cầu phòng chờ")).toHaveCount(0);
 
-    const confirmRow = studentPage
-      .locator("tbody tr")
-      .filter({ hasText: course.code })
-      .filter({ has: studentPage.getByRole("button", { name: /Xác nhận/i }) });
-    await expect(confirmRow).toHaveCount(1);
+    await studentPage.getByRole("button", { name: "Open notifications" }).click();
+    await expect(studentPage.getByText(/Admin đã duyệt đề xuất phòng chờ/i)).toBeVisible();
+    await studentPage.getByText(/Admin đã duyệt đề xuất phòng chờ/i).click();
+
+    const dialog = studentPage.getByRole("dialog");
+    await expect(dialog).toBeVisible();
 
     await Promise.all([
-      studentPage.waitForResponse(
-        (response) => response.url().includes("/api/waiting/confirm") && response.ok(),
-      ),
-      confirmRow.getByRole("button", { name: /Xác nhận/i }).click(),
+      studentPage.waitForResponse((response) => response.url().includes("/api/waiting/confirm") && response.ok()),
+      dialog.getByRole("button", { name: "Confirm waiting offer" }).click(),
     ]);
+
+    const enrolledRow = studentPage
+      .locator("tbody tr")
+      .filter({ hasText: course.code })
+      .filter({ hasText: "Qua phòng chờ" })
+      .first();
+    await expect(enrolledRow).toBeVisible();
 
     await studentPage.goto("/student/finance");
     const financeRow = studentPage.locator("tbody tr").filter({ hasText: course.code });
