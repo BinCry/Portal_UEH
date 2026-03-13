@@ -17,3 +17,12 @@ export const requireApiRole = async (role?: Role) => {
   }
   return { ok: true as const, user };
 };
+
+export const requireApiLocationViewer = async () => {
+  const auth = await requireApiRole("ADMIN");
+  if (!auth.ok) return auth;
+  if (!auth.user.isLocationViewer) {
+    return { ok: false as const, status: 403, message: "Không đủ quyền" };
+  }
+  return auth;
+};

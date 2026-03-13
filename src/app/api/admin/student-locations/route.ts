@@ -1,7 +1,7 @@
 import { Role } from "@prisma/client";
 import { fail, ok } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { requireApiRole } from "@/lib/route-guards";
+import { requireApiLocationViewer } from "@/lib/route-guards";
 
 type StudentLocationRow = {
   id: string;
@@ -27,7 +27,7 @@ const compareRows = (left: StudentLocationRow, right: StudentLocationRow) => {
 };
 
 export async function GET() {
-  const auth = await requireApiRole("ADMIN");
+  const auth = await requireApiLocationViewer();
   if (!auth.ok) return fail({ code: "UNAUTHORIZED", message: auth.message }, auth.status);
 
   const students = await prisma.user.findMany({

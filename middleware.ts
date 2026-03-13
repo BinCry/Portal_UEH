@@ -29,6 +29,10 @@ export async function middleware(request: NextRequest) {
 
   const adminLandingPath = token.isLocationViewer ? "/admin/student-locations" : "/admin/dashboard";
 
+  if (pathname.startsWith("/admin/student-locations") && !token.isLocationViewer) {
+    return NextResponse.redirect(new URL(adminLandingPath, request.url));
+  }
+
   if (pathname.startsWith("/admin") && token.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/student/dashboard", request.url));
   }

@@ -126,3 +126,11 @@ export const requireRole = async (role: Role) => {
   }
   return session;
 };
+
+export const requireLocationViewer = async () => {
+  const session = await requireRole("ADMIN");
+  if (!session.user.isLocationViewer) {
+    redirect("/admin/dashboard");
+  }
+  return session;
+};

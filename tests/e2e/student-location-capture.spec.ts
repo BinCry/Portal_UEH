@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { prisma } from "../../src/lib/prisma";
 import { createTestDbContext, makePrefix } from "../support/db-fixtures";
-import { login } from "./helpers/auth";
+import { login, loginAdmin } from "./helpers/auth";
 
 const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 const STUDENT_LOCATION = {
@@ -105,4 +105,13 @@ test("student can still access pages when geolocation is denied", async ({ page 
   } finally {
     await ctx.cleanup();
   }
+});
+
+test("regular admin cannot access the student locations page", async ({ page }) => {
+  await loginAdmin(page);
+  await expect(page.getByRole("link", { name: "Vị trí SV" })).toHaveCount(0);
+
+  await page.goto("/admin/student-locations");
+  await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expect(page.getByText("Vị trí sinh viên")).toHaveCount(0);
 });
