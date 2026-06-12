@@ -1,6 +1,14 @@
 # UEH Smart Registration Portal
 
-Ứng dụng fullstack Next.js cho cổng đăng ký học phần thông minh, có phòng chờ FIFO, SLA 48h và phân quyền Student/Admin.
+[![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-76E2B2?style=for-the-badge&logo=vitest&logoColor=6E6E6E)](https://vitest.dev/)
+
+Hệ thống cổng thông tin Portal dành cho sinh viên Đại học Kinh tế TP. Hồ Chí Minh (UEH).
 
 ## Stack
 - Next.js App Router + TypeScript
